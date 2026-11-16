@@ -88,7 +88,7 @@ class IndicatorAlerta:
         self.lbl_procent.config(text=f"{progres * 100:.0f}%", fg=culoare)
 
 
-def slider(cadru, eticheta, variabila, val_min, val_max, format_val):
+def slider(cadru, eticheta, variabila, val_min, val_max, pas, format_val):
     rand = tk.Frame(cadru, bg=CULOARE_CARD)
     rand.pack(fill="x", padx=15, pady=(0, 8))
 
@@ -100,7 +100,7 @@ def slider(cadru, eticheta, variabila, val_min, val_max, format_val):
     lbl_val.pack(side="right")
     variabila.trace_add("write", lambda *_: lbl_val.config(text=format_val(variabila.get())))
 
-    tk.Scale(rand, variable=variabila, from_=val_min, to=val_max, resolution=(val_max - val_min) / 100,
+    tk.Scale(rand, variable=variabila, from_=val_min, to=val_max, resolution=pas,
              orient="horizontal", showvalue=False, bg=CULOARE_CARD, fg=CULOARE_ACCENT,
              highlightthickness=0, troughcolor=CULOARE_SEPARATOR, activebackground=CULOARE_ACCENT
              ).pack(side="left", fill="x", expand=True, padx=(8, 8))

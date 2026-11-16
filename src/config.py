@@ -11,6 +11,9 @@ MAPARE_EMOTII = DIR_MODELE / "mapare_emotii.json"
 TASK_MANA = DIR_MODELE / "hand_landmarker.task"
 TASK_FATA = DIR_MODELE / "blaze_face_short_range.tflite"
 
+FISIER_SETARI = DIR_PROIECT / "setari_pacient.json"
+DIR_JURNAL = DIR_PROIECT / "jurnal"
+
 #config
 PRAG_INCREDERE_GEST = 0.75          #prag ignorare gest
 TIMP_CONFIRMARE_GEST = 2.5          #sec. gest -> comanda

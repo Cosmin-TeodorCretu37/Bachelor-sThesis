@@ -1,0 +1,7 @@
+* text=auto
+*.h5 binary
+*.keras binary
+*.task binary
+*.tflite binary
+*.png binary
+*.pdf binary

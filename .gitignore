@@ -3,3 +3,5 @@ model_emotii/
 model_gesturi/
 __pycache__/
 *.pyc
+setari_pacient.json
+jurnal/

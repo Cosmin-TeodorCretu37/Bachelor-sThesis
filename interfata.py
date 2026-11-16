@@ -7,6 +7,7 @@ import cv2
 from PIL import Image, ImageTk
 
 from src import componente_ui as ui
+from src import jurnal
 from src.clasificator_emotii import ClasificatorEmotii
 from src.clasificator_gesturi import ClasificatorGesturi
 from src.config import (
@@ -37,8 +38,10 @@ from src.config import (
     TIMP_CONFIRMARE_GEST,
 )
 from src.detectoare import deseneaza_mana
+from src.jurnal import JurnalEvenimente
 from src.monitorizare import ConfirmareGest, StareSustinuta
 from src.procesare_fundal import ProcesareFundal
+from src.setari import SetariPacient
 from src.sinteza_vocala import SintezaVocala
 
 log = logging.getLogger(__name__)
@@ -57,6 +60,7 @@ class Aplicatie:
         self.detector_gesturi = ClasificatorGesturi()
         self.analiza_emotii = ProcesareFundal(self.detector_emotii.proceseaza_cadru)
         self.tts = SintezaVocala()
+        self.jurnal = JurnalEvenimente()
         log.info("Modele incarcate.")
 
         #emotie/disconfort
@@ -78,16 +82,18 @@ class Aplicatie:
         self.fps_time = time.time()
         self.fps = 0.0
 
+        setari = SetariPacient.incarca()
+
         #toggle on/off
-        self.activ_gest = tk.BooleanVar(value=True)
-        self.activ_emotie = tk.BooleanVar(value=True)
-        self.activ_alerte = tk.BooleanVar(value=True)
-        self.activ_istoric = tk.BooleanVar(value=True)
+        self.activ_gest = tk.BooleanVar(value=setari.activ_gest)
+        self.activ_emotie = tk.BooleanVar(value=setari.activ_emotie)
+        self.activ_alerte = tk.BooleanVar(value=setari.activ_alerte)
+        self.activ_istoric = tk.BooleanVar(value=setari.activ_istoric)
 
         # setari reglabile live
-        self.var_prag_gest = tk.DoubleVar(value=PRAG_INCREDERE_GEST)
-        self.var_timp_confirmare = tk.DoubleVar(value=TIMP_CONFIRMARE_GEST)
-        self.var_prag_alerta = tk.DoubleVar(value=PRAG_ALERTA)
+        self.var_prag_gest = tk.DoubleVar(value=setari.prag_gest)
+        self.var_timp_confirmare = tk.DoubleVar(value=setari.timp_confirmare)
+        self.var_prag_alerta = tk.DoubleVar(value=setari.prag_alerta)
 
         self._construieste_ui()
 
@@ -98,6 +104,7 @@ class Aplicatie:
 
         self.activ = True
         self.id_bucla = None
+        self.jurnal.inregistreaza(jurnal.PORNIRE)
         self._update()
 
     #UI
@@ -153,9 +160,9 @@ class Aplicatie:
         ui.separator(panou)
 
         cadru = ui.card(panou, "SETARI PACIENT", pady_titlu=(10, 6))
-        ui.slider(cadru, "Incredere minima gest", self.var_prag_gest, 0.50, 0.95, lambda v: f"{v:.0%}")
-        ui.slider(cadru, "Timp confirmare (sec)", self.var_timp_confirmare, 1.0, 5.0, lambda v: f"{v:.1f}s")
-        ui.slider(cadru, "Timp alerta (sec)", self.var_prag_alerta, 3.0, 15.0, lambda v: f"{v:.0f}s")
+        ui.slider(cadru, "Incredere minima gest", self.var_prag_gest, 0.50, 0.95, 0.01, lambda v: f"{v:.0%}")
+        ui.slider(cadru, "Timp confirmare (sec)", self.var_timp_confirmare, 1.0, 5.0, 0.1, lambda v: f"{v:.1f}s")
+        ui.slider(cadru, "Timp alerta (sec)", self.var_prag_alerta, 3.0, 15.0, 0.5, lambda v: f"{v:.1f}s")
         tk.Frame(cadru, bg=CULOARE_BORDURA, height=1).pack(fill="x", padx=15)
         tk.Button(cadru, text="Reseteaza valorile implicite", font=(ui.FONT, 8), bg=CULOARE_CARD,
                   fg=CULOARE_TEXT_SECUNDAR, activebackground=CULOARE_SEPARATOR, activeforeground=CULOARE_ACCENT,
@@ -171,6 +178,17 @@ class Aplicatie:
         self.var_prag_gest.set(PRAG_INCREDERE_GEST)
         self.var_timp_confirmare.set(TIMP_CONFIRMARE_GEST)
         self.var_prag_alerta.set(PRAG_ALERTA)
+
+    def _setari_curente(self):
+        return SetariPacient(
+            prag_gest=self.var_prag_gest.get(),
+            timp_confirmare=self.var_timp_confirmare.get(),
+            prag_alerta=self.var_prag_alerta.get(),
+            activ_gest=self.activ_gest.get(),
+            activ_emotie=self.activ_emotie.get(),
+            activ_alerte=self.activ_alerte.get(),
+            activ_istoric=self.activ_istoric.get(),
+        )
 
     def _anuleaza_ultima_comanda(self):
         self.urgenta.reseteaza()
@@ -247,9 +265,12 @@ class Aplicatie:
         if confirmat:
             self.tts.roteste(comanda)
             if gest == ClasificatorGesturi.GEST_ANULARE:
+                self.jurnal.inregistreaza(jurnal.ANULARE)
                 self._anuleaza_ultima_comanda()
-            elif self.activ_istoric.get():
-                self.istoric_comenzi.append(comanda)
+            else:
+                self.jurnal.inregistreaza(jurnal.COMANDA, comanda)
+                if self.activ_istoric.get():
+                    self.istoric_comenzi.append(comanda)
 
         stare_afisata["comanda"] = comanda
         stare_afisata["progres_gest"] = progres
@@ -292,10 +313,16 @@ class Aplicatie:
             return 0.0, 0.0
 
         prag = self.var_prag_alerta.get()
+        urgenta_era_activa, disconfort_era_activ = self.urgenta.activa, self.disconfort.activa
         progres_urgenta, anunta_urgenta = self.urgenta.actualizeaza(
             self.gest_curent == ClasificatorGesturi.GEST_URGENTA, now, prag)
         progres_disconfort, anunta_disconfort = self.disconfort.actualizeaza(
             self.stare_pacient in ClasificatorEmotii.STARI_DISCONFORT, now, prag)
+
+        if self.urgenta.activa and not urgenta_era_activa:
+            self.jurnal.inregistreaza(jurnal.ALERTA_URGENTA)
+        if self.disconfort.activa and not disconfort_era_activ:
+            self.jurnal.inregistreaza(jurnal.ALERTA_DISCONFORT)
 
         if anunta_urgenta:
             self.tts.roteste_prioritar(MESAJ_URGENTA)
@@ -338,6 +365,8 @@ class Aplicatie:
 
     def _inchide(self):
         self.activ = False
+        self._setari_curente().salveaza()
+        self.jurnal.inregistreaza(jurnal.OPRIRE)
         if self.id_bucla is not None:
             self.root.after_cancel(self.id_bucla)
         self.cap.release()
