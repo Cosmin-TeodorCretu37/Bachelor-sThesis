@@ -12,7 +12,7 @@ from src.sinteza_vocala import SintezaVocala
 #config
 PRAG_INCREDERE_GEST = 0.75          #prag ignorare gest
 TIMP_CONFIRMARE_GEST = 2.5          #sec. gest -> comanda
-LUNGIME_ISTORIC_EMOTII = 7          #cadre vot majoritar
+LUNGIME_ISTORIC_EMOTII = 10          #cadre vot majoritar
 
 PRAG_ALERTA_DISCONFORT = 7.0       #sec disconfort -> alerta
 PRAG_ALERTA_URGENTA = 7.0          #sec pumn inchis -> alerta
@@ -559,18 +559,38 @@ class Aplicatie:
             stare_afisata["incredere_emotie"] = res['incredere']
 
         fata_prezenta = (now - self.ultima_detectie_fata) <= GRACE_FATA
+
         stare_curenta = None
         if rezultate_emotii:
             stare_curenta = Counter(self.istoric_emotii).most_common(1)[0][0][0]
 
-        if fata_prezenta and stare_curenta == 'Discomfort / Pain':
-            if fata_prezenta and stare_curenta == 'Discomfort/Pain' and self.activ_alerte.get():
-                if self.disconfort_start is None:
-                    self.disconfort_start = now
-            else:
+        if (fata_prezenta
+                and stare_curenta in ['Discomfort/Pain', 'Discomfort']
+                and self.activ_alerte.get()):
+
+            if self.disconfort_start is None:
+                self.disconfort_start = now
+
+        else:
+            if not self.disconfort_alerta_activa:
                 self.disconfort_start = None
-                self.disconfort_alerta_activa = False
                 self.disconfort_ultima_rostire = None
+
+        # #!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+        # fata_prezenta = (now - self.ultima_detectie_fata) <= GRACE_FATA
+        # stare_curenta = None
+        # if rezultate_emotii:
+        #     stare_curenta = Counter(self.istoric_emotii).most_common(1)[0][0][0]
+
+        # if fata_prezenta and stare_curenta == 'Discomfort / Pain':
+        #     if fata_prezenta and stare_curenta == 'Discomfort/Pain' and self.activ_alerte.get():
+        #         if self.disconfort_start is None:
+        #             self.disconfort_start = now
+        #     else:
+        #         self.disconfort_start = None
+        #         self.disconfort_alerta_activa = False
+        #         self.disconfort_ultima_rostire = None
         
         # #!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
         # if fata_prezenta and stare_curenta == 'Comfort':
@@ -664,12 +684,6 @@ class Aplicatie:
         self.activ = False
         self.cap.release()
         self.root.destroy()
-
-
-# if __name__ == "__main__":
-#     root = tk.Tk()
-#     app = Aplicatie(root)
-#     root.mainloop()
 
 if __name__ == "__main__":
     from src.ecran_pornire import EcranPornire
