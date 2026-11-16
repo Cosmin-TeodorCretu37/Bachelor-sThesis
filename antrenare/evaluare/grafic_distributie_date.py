@@ -20,15 +20,15 @@ for gest in GESTURI:
     df = pd.read_csv(fisier, header=None)
     nr_exemple.append(len(df))
 
-#numaram imaginile per emotie din FER2013
+#numaram imaginile per emotie din FER+
 EMOTII_FER = ['angry', 'disgust', 'fear', 'happy', 'neutral', 'sad', 'surprise']
 emotii_ro = ['Furie', 'Dezgust', 'Frica','Bucurie', 'Neutru', 'Tristete', 'Surpriza']
 nr_imagini_train = []
 nr_imagini_test = []
 
 for emotie in EMOTII_FER:
-    folder_train = DIR_ANTRENARE / "fer2013" / "train" / emotie
-    folder_test = DIR_ANTRENARE / "fer2013" / "test" / emotie
+    folder_train = DIR_ANTRENARE / "ferplus" / "train" / emotie
+    folder_test = DIR_ANTRENARE / "ferplus" / "test" / emotie
     nr_imagini_train.append(len(os.listdir(folder_train)) if os.path.exists(folder_train) else 0)
     nr_imagini_test.append(len(os.listdir(folder_test)) if os.path.exists(folder_test) else 0)
 

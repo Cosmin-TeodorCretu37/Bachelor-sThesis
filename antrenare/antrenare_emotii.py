@@ -9,13 +9,12 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from src.config import DIR_ANTRENARE, DIR_MODELE, MAPARE_EMOTII, MODEL_EMOTII
 
-DIR_DATE = DIR_ANTRENARE / "fer2013"
+DIR_DATE = DIR_ANTRENARE / "ferplus"
 
 #parametri generali
 IMG_SIZE = 48
 BATCH_SIZE = 32
 EPOCHS = 50
-PROCENT_VALIDARE = 0.1
 
 #augmentare date antrenare
 #generam variante ale imaginilor (rotite, oglindite, zoom)
@@ -25,15 +24,10 @@ train_datagen = keras.preprocessing.image.ImageDataGenerator(
     width_shift_range=0.1,
     height_shift_range=0.1,
     horizontal_flip=True,
-    zoom_range=0.1,
-    validation_split=PROCENT_VALIDARE
+    zoom_range=0.1
 )
 
 #datele de validare si test doar se normalizeaza
-val_datagen = keras.preprocessing.image.ImageDataGenerator(
-    rescale=1./255,
-    validation_split=PROCENT_VALIDARE
-)
 test_datagen = keras.preprocessing.image.ImageDataGenerator(
     rescale=1./255
 )
@@ -47,10 +41,10 @@ parametri_comuni = dict(
 )
 
 train_generator = train_datagen.flow_from_directory(
-    DIR_DATE / "train", subset='training', **parametri_comuni
+    DIR_DATE / "train", **parametri_comuni
 )
-val_generator = val_datagen.flow_from_directory(
-    DIR_DATE / "train", subset='validation', shuffle=False, **parametri_comuni
+val_generator = test_datagen.flow_from_directory(
+    DIR_DATE / "val", shuffle=False, **parametri_comuni
 )
 test_generator = test_datagen.flow_from_directory(
     DIR_DATE / "test", shuffle=False, **parametri_comuni

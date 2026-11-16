@@ -23,12 +23,12 @@ with open(MAPARE_EMOTII) as f:
 idx_to_emotie = {v: k for k, v in mapare.items()}
 EMOTII = [idx_to_emotie[i] for i in range(len(mapare))]
 
-#incarcare date test din FER2013
+#incarcare date test din FER+
 IMG_SIZE = 48
 
 test_datagen = keras.preprocessing.image.ImageDataGenerator(rescale=1./255)
 test_generator = test_datagen.flow_from_directory(
-    DIR_ANTRENARE / "fer2013" / "test",
+    DIR_ANTRENARE / "ferplus" / "test",
     target_size=(IMG_SIZE, IMG_SIZE),
     batch_size=32,
     color_mode='grayscale',
