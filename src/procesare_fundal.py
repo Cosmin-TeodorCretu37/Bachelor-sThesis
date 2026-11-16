@@ -1,4 +1,7 @@
+import logging
 import threading
+
+log = logging.getLogger(__name__)
 
 
 class ProcesareFundal:
@@ -10,7 +13,8 @@ class ProcesareFundal:
         self._rezultat_nou = False
         self._ocupat = False
         self._activ = True
-        threading.Thread(target=self._ruleaza, daemon=True).start()
+        self._fir = threading.Thread(target=self._ruleaza, daemon=True)
+        self._fir.start()
 
     def trimite(self, date):
         with self._conditie:
@@ -25,10 +29,11 @@ class ProcesareFundal:
             nou, self._rezultat_nou = self._rezultat_nou, False
             return self._rezultat, nou
 
-    def opreste(self):
+    def opreste(self, timeout=2.0):
         with self._conditie:
             self._activ = False
             self._conditie.notify()
+        self._fir.join(timeout)
 
     def _ruleaza(self):
         while True:
@@ -42,8 +47,8 @@ class ProcesareFundal:
 
             try:
                 rezultat = self._functie(date)
-            except Exception as e:
-                print(f"[Procesare fundal] Eroare: {e}")
+            except Exception:
+                log.exception("Eroare in procesarea de fundal")
                 rezultat = None
 
             with self._conditie:

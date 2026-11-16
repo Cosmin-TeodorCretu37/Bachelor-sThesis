@@ -1,10 +1,19 @@
 import json
+from dataclasses import dataclass
+from typing import Any
 
 import numpy as np
 import tensorflow as tf
 
-from src import repere_mana
-from src.config import DIR_MODELE
+from src.config import MAPARE_GESTURI, MODEL_GESTURI
+from src.detectoare import DetectorMana, normalizeaza_mana
+
+
+@dataclass
+class RezultatGest:
+    landmarks: Any
+    gest: str
+    incredere: float
 
 
 class ClasificatorGesturi:
@@ -20,16 +29,15 @@ class ClasificatorGesturi:
         'palma_deschisa': 'Cancel command.'
     }
 
-    def __init__(self, calea_model=DIR_MODELE / "model_gesturi.h5",
-                 calea_mapare=DIR_MODELE / "mapare_gesturi.json"):
+    def __init__(self, calea_model=MODEL_GESTURI, calea_mapare=MAPARE_GESTURI):
         self.model = tf.keras.models.load_model(calea_model)
         with open(calea_mapare) as f:
             self.idx_la_gest = {int(v): k for k, v in json.load(f).items()}
 
-        self.detector = repere_mana.DetectorMana(incredere=0.6)
+        self.detector = DetectorMana(incredere=0.6)
 
     def predictie(self, hand_landmarks):
-        input_model = np.array([repere_mana.normalizeaza(hand_landmarks)], dtype=np.float32)
+        input_model = np.array([normalizeaza_mana(hand_landmarks)], dtype=np.float32)
         procente = self.model(input_model, training=False).numpy()[0]
         max_idx = int(np.argmax(procente))
         return self.idx_la_gest[max_idx], float(procente[max_idx])
@@ -37,9 +45,9 @@ class ClasificatorGesturi:
     def proceseaza_cadru(self, frame):
         landmarks = self.detector.detecteaza(frame)
         if landmarks is None:
-            return None, None, 0.0
+            return None
         gest, incredere = self.predictie(landmarks)
-        return landmarks, gest, incredere
+        return RezultatGest(landmarks, gest, incredere)
 
     def inchide(self):
         self.detector.inchide()

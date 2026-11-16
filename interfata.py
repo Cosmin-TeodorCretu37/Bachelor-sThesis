@@ -1,48 +1,47 @@
+import logging
 import time
 import tkinter as tk
-from collections import deque, Counter
+from collections import Counter, deque
 
 import cv2
 from PIL import Image, ImageTk
 
-from src import repere_mana
+from src import componente_ui as ui
 from src.clasificator_emotii import ClasificatorEmotii
 from src.clasificator_gesturi import ClasificatorGesturi
+from src.config import (
+    CULOARE_ACCENT,
+    CULOARE_ALERTA_1,
+    CULOARE_ALERTA_2,
+    CULOARE_BORDURA,
+    CULOARE_CARD,
+    CULOARE_FUNDAL,
+    CULOARE_SEPARATOR,
+    CULOARE_SUCCES,
+    CULOARE_TEXT_LABEL,
+    CULOARE_TEXT_SECUNDAR,
+    GRACE_FATA,
+    GRACE_GEST,
+    INALTIME_VIDEO,
+    INTERVAL_BUCLA_MS,
+    INTERVAL_EMOTII,
+    INTERVAL_RE_ALERTA_DISCONFORT,
+    INTERVAL_RE_ALERTA_URGENTA,
+    LATIME_VIDEO,
+    LUNGIME_ISTORIC_COMENZI,
+    LUNGIME_ISTORIC_EMOTII,
+    MESAJ_DISCONFORT,
+    MESAJ_URGENTA,
+    PRAG_ALERTA,
+    PRAG_INCREDERE_GEST,
+    TIMP_CONFIRMARE_GEST,
+)
+from src.detectoare import deseneaza_mana
 from src.monitorizare import ConfirmareGest, StareSustinuta
 from src.procesare_fundal import ProcesareFundal
 from src.sinteza_vocala import SintezaVocala
 
-#config
-PRAG_INCREDERE_GEST = 0.75          #prag ignorare gest
-TIMP_CONFIRMARE_GEST = 2.5          #sec. gest -> comanda
-LUNGIME_ISTORIC_EMOTII = 10          #cadre vot majoritar
-PRAG_ALERTA = 7.0
-
-GRACE_FATA = 1.5                    #toleranta fata
-GRACE_GEST = 1.0                    #toleranta gest
-
-INTERVAL_RE_ALERTA_DISCONFORT = 15  #re-anunt vocal
-INTERVAL_RE_ALERTA_URGENTA = 5
-
-INTERVAL_EMOTII = 3
-INTERVAL_BUCLA_MS = 1
-LATIME_VIDEO, INALTIME_VIDEO = 640, 480
-
-STARI_DISCONFORT = ('Discomfort/Pain', 'Discomfort')
-MESAJ_URGENTA = "Critical alert. Emergency signal sustained. Please respond immediately."
-MESAJ_DISCONFORT = "Attention. Patient has been showing signs of discomfort for an extended period."
-
-CULOARE_FUNDAL = "#0d1117"
-CULOARE_CARD = "#161b22"
-CULOARE_BORDURA = "#30363d"
-CULOARE_TEXT_SECUNDAR = "#8b949e"
-CULOARE_TEXT_LABEL = "#484f58"
-CULOARE_ACCENT = "#58a6ff"
-CULOARE_ALERTA_1 = "#f85149"
-CULOARE_ALERTA_2 = "#7a1f1a"
-CULOARE_SEPARATOR = "#21262d"
-CULOARE_SUCCES = "#3fb950"
-CULOARE_AVERTIZARE = "#d29922"
+log = logging.getLogger(__name__)
 
 
 class Aplicatie:
@@ -53,12 +52,12 @@ class Aplicatie:
         self.root.configure(bg=CULOARE_FUNDAL)
         self.root.protocol("WM_DELETE_WINDOW", self._inchide)
 
-        print("Se incarca modelele...")
+        log.info("Se incarca modelele...")
         self.detector_emotii = ClasificatorEmotii()
         self.detector_gesturi = ClasificatorGesturi()
         self.analiza_emotii = ProcesareFundal(self.detector_emotii.proceseaza_cadru)
         self.tts = SintezaVocala()
-        print("Modele incarcate.")
+        log.info("Modele incarcate.")
 
         #emotie/disconfort
         self.istoric_emotii = deque(maxlen=LUNGIME_ISTORIC_EMOTII)
@@ -71,7 +70,7 @@ class Aplicatie:
         #gest/comanda
         self.confirmare_gest = ConfirmareGest(GRACE_GEST)
         self.gest_curent = None
-        self.istoric_comenzi = deque(maxlen=7)
+        self.istoric_comenzi = deque(maxlen=LUNGIME_ISTORIC_COMENZI)
 
         #stare urgenta
         self.urgenta = StareSustinuta(INTERVAL_RE_ALERTA_URGENTA, grace=GRACE_GEST)
@@ -103,216 +102,70 @@ class Aplicatie:
 
     #UI
     def _construieste_ui(self):
-        header = tk.Frame(self.root, bg=CULOARE_FUNDAL, height=60)
+        header = tk.Frame(self.root, bg=CULOARE_FUNDAL)
         header.pack(fill="x", padx=20, pady=(15, 0))
 
-        tk.Label(header, text="SISTEM MEDICAL ASISTIV", font=("Courier", 16, "bold"),
+        tk.Label(header, text="SISTEM MEDICAL ASISTIV", font=(ui.FONT, 16, "bold"),
                  bg=CULOARE_FUNDAL, fg=CULOARE_ACCENT).pack(side="left")
 
-        self.lbl_fps = tk.Label(header, text="FPS: 0", font=("Courier", 11),
+        self.lbl_fps = tk.Label(header, text="FPS: 0", font=(ui.FONT, 11),
                                 bg=CULOARE_FUNDAL, fg=CULOARE_TEXT_LABEL)
         self.lbl_fps.pack(side="right", padx=10)
 
-        self.lbl_banner = tk.Label(self.root, text="", font=("Courier", 13, "bold"),
+        self.lbl_banner = tk.Label(self.root, text="", font=(ui.FONT, 13, "bold"),
                                    bg=CULOARE_FUNDAL, fg="white", pady=8)
         self.lbl_banner.pack(fill="x", padx=20, pady=(10, 0))
 
         corp = tk.Frame(self.root, bg=CULOARE_FUNDAL)
         corp.pack(fill="both", expand=True, padx=20, pady=10)
 
-        cadru_video = tk.Frame(corp, bg=CULOARE_CARD, highlightbackground=CULOARE_BORDURA,
-                               highlightthickness=1)
+        cadru_video = tk.Frame(corp, bg=CULOARE_CARD, highlightbackground=CULOARE_BORDURA, highlightthickness=1)
         cadru_video.pack(side="left", padx=(0, 15))
         self.lbl_video = tk.Label(cadru_video, bg=CULOARE_CARD)
         self.lbl_video.pack(padx=2, pady=2)
 
-        panou_container = tk.Frame(corp, bg=CULOARE_FUNDAL)
-        panou_container.pack(side="left", fill="both", expand=True)
+        panou = ui.panou_derulant(corp)
 
-        canvas_panou = tk.Canvas(panou_container, bg=CULOARE_FUNDAL, highlightthickness=0, bd=0)
-        scrollbar = tk.Scrollbar(panou_container, orient="vertical", command=canvas_panou.yview)
-        canvas_panou.configure(yscrollcommand=scrollbar.set)
+        cadru = ui.card(panou, "COMANDA ASISTIVA", self.activ_gest, CULOARE_ACCENT)
+        self.lbl_gest = ui.text_mare(cadru, CULOARE_ACCENT)
+        self.lbl_conf_gest = ui.rand_valoare(cadru, "Confirmare comanda:", CULOARE_TEXT_LABEL,
+                                             CULOARE_ACCENT, pady=(4, 4))
+        self.bara_gest = ui.BaraProgres(cadru, CULOARE_ACCENT, (0, 12))
+        ui.separator(panou)
 
-        scrollbar.pack(side="right", fill="y")
-        canvas_panou.pack(side="left", fill="both", expand=True)
+        cadru = ui.card(panou, "STARE PACIENT", self.activ_emotie, CULOARE_SUCCES)
+        self.lbl_emotie = ui.text_mare(cadru, CULOARE_SUCCES)
+        self.lbl_emotie_raw = tk.Label(cadru, text="", font=(ui.FONT, 9),
+                                       bg=CULOARE_CARD, fg=CULOARE_TEXT_SECUNDAR)
+        self.lbl_emotie_raw.pack(anchor="w", padx=15, pady=(0, 8))
+        self.bara_emotie = ui.BaraProgres(cadru, CULOARE_SUCCES, (0, 12))
+        ui.separator(panou)
 
-        panou = tk.Frame(canvas_panou, bg=CULOARE_FUNDAL)
-        id_fereastra_panou = canvas_panou.create_window((0, 0), window=panou, anchor="nw")
+        cadru = ui.card(panou, "MONITORIZARE ALERTE", self.activ_alerte, CULOARE_ALERTA_1, pady_titlu=(10, 8))
+        self.indicator_disconfort = ui.IndicatorAlerta(cadru, "Disconfort / Durere sustinut(a)", (2, 10))
+        self.indicator_urgenta = ui.IndicatorAlerta(cadru, "Semnal de urgenta sustinut", (2, 12))
+        ui.separator(panou)
 
-        def _actualizeaza_scroll(event=None):
-            canvas_panou.configure(scrollregion=canvas_panou.bbox("all"))
-            canvas_panou.itemconfig(id_fereastra_panou, width=canvas_panou.winfo_width())
+        cadru = ui.card(panou, "ISTORIC COMENZI", self.activ_istoric, CULOARE_ACCENT, pady_titlu=(10, 6))
+        self.lbl_istoric = tk.Label(cadru, text="—", font=(ui.FONT, 10), bg=CULOARE_CARD,
+                                    fg=CULOARE_TEXT_SECUNDAR, wraplength=340, justify="left")
+        self.lbl_istoric.pack(anchor="w", padx=15, pady=(0, 12))
+        ui.separator(panou)
 
-        panou.bind("<Configure>", _actualizeaza_scroll)
-        canvas_panou.bind("<Configure>", _actualizeaza_scroll)
+        cadru = ui.card(panou, "SETARI PACIENT", pady_titlu=(10, 6))
+        ui.slider(cadru, "Incredere minima gest", self.var_prag_gest, 0.50, 0.95, lambda v: f"{v:.0%}")
+        ui.slider(cadru, "Timp confirmare (sec)", self.var_timp_confirmare, 1.0, 5.0, lambda v: f"{v:.1f}s")
+        ui.slider(cadru, "Timp alerta (sec)", self.var_prag_alerta, 3.0, 15.0, lambda v: f"{v:.0f}s")
+        tk.Frame(cadru, bg=CULOARE_BORDURA, height=1).pack(fill="x", padx=15)
+        tk.Button(cadru, text="Reseteaza valorile implicite", font=(ui.FONT, 8), bg=CULOARE_CARD,
+                  fg=CULOARE_TEXT_SECUNDAR, activebackground=CULOARE_SEPARATOR, activeforeground=CULOARE_ACCENT,
+                  bd=0, padx=10, pady=6, cursor="hand2",
+                  command=self._reseteaza_setari).pack(anchor="e", padx=15, pady=8)
 
-        def _scroll_mouse(event):
-            canvas_panou.yview_scroll(int(-1 * (event.delta / 120)), "units")
-
-        canvas_panou.bind_all("<MouseWheel>", _scroll_mouse)
-
-        self._card_gest(panou)
-        self._separator(panou)
-        self._card_emotie(panou)
-        self._separator(panou)
-        self._card_alerte(panou)
-        self._separator(panou)
-        self._card_istoric(panou)
-        self._separator(panou)
-        self._panou_setari(panou)
-
-        tk.Button(self.root, text="⏹  Oprește aplicația", font=("Courier", 11, "bold"),
+        tk.Button(self.root, text="⏹  Oprește aplicația", font=(ui.FONT, 11, "bold"),
                   bg=CULOARE_SEPARATOR, fg=CULOARE_ALERTA_1, activebackground="#2d1b1b",
                   activeforeground=CULOARE_ALERTA_1, bd=0, padx=20, pady=8, cursor="hand2",
                   command=self._inchide).pack(pady=(5, 15))
-
-    @staticmethod
-    def _separator(parinte):
-        tk.Frame(parinte, bg=CULOARE_SEPARATOR, height=1).pack(fill="x", pady=10)
-
-    @staticmethod
-    def _card(parinte):
-        cadru = tk.Frame(parinte, bg=CULOARE_CARD, highlightbackground=CULOARE_BORDURA,
-                         highlightthickness=1)
-        cadru.pack(fill="x")
-        return cadru
-
-    def _antet_card(self, cadru, titlu, variabila, culoare_on, pady):
-        antet = tk.Frame(cadru, bg=CULOARE_CARD)
-        antet.pack(fill="x", padx=15, pady=pady)
-        tk.Label(antet, text=titlu, font=("Courier", 9, "bold"),
-                 bg=CULOARE_CARD, fg=CULOARE_TEXT_LABEL).pack(side="left")
-        self._adauga_buton_toggle(antet, variabila, culoare_on)
-
-    @staticmethod
-    def _bara_progres(cadru, culoare, pady):
-        bara_bg = tk.Frame(cadru, bg=CULOARE_SEPARATOR, height=6)
-        bara_bg.pack(fill="x", padx=15, pady=pady)
-        bara = tk.Frame(bara_bg, bg=culoare, height=6)
-        bara.place(x=0, y=0, relheight=1, width=0)
-        return bara, bara_bg
-
-    @staticmethod
-    def _adauga_buton_toggle(parinte, variabila, culoare_on):
-        buton = tk.Button(parinte, font=("Courier", 9, "bold"), bd=0, cursor="hand2", width=5)
-
-        def update_vizual():
-            if variabila.get():
-                buton.config(text="ON", bg=culoare_on, fg="white")
-            else:
-                buton.config(text="OFF", bg=CULOARE_BORDURA, fg=CULOARE_TEXT_SECUNDAR)
-
-        def la_click():
-            variabila.set(not variabila.get())
-            update_vizual()
-
-        buton.config(command=la_click)
-        update_vizual()
-        buton.pack(side="right")
-
-    def _card_gest(self, parinte):
-        cadru = self._card(parinte)
-        self._antet_card(cadru, "COMANDA ASISTIVA", self.activ_gest, CULOARE_ACCENT, (10, 2))
-
-        self.lbl_gest = tk.Label(cadru, text="—", font=("Courier", 24, "bold"),
-                                 bg=CULOARE_CARD, fg=CULOARE_ACCENT, justify="left")
-        self.lbl_gest.pack(anchor="w", padx=15)
-
-        info_frame = tk.Frame(cadru, bg=CULOARE_CARD)
-        info_frame.pack(fill="x", padx=15, pady=(4, 4))
-        tk.Label(info_frame, text="Confirmare comanda:", font=("Courier", 9),
-                 bg=CULOARE_CARD, fg=CULOARE_TEXT_LABEL).pack(side="left")
-        self.lbl_conf_gest = tk.Label(info_frame, text="0%", font=("Courier", 9, "bold"),
-                                      bg=CULOARE_CARD, fg=CULOARE_ACCENT)
-        self.lbl_conf_gest.pack(side="right")
-
-        self.bara_gest, self.bara_gest_bg = self._bara_progres(cadru, CULOARE_ACCENT, (0, 12))
-
-    def _card_emotie(self, parinte):
-        cadru = self._card(parinte)
-        self._antet_card(cadru, "STARE PACIENT", self.activ_emotie, CULOARE_SUCCES, (10, 2))
-
-        self.lbl_emotie = tk.Label(cadru, text="—", font=("Courier", 24, "bold"),
-                                   bg=CULOARE_CARD, fg=CULOARE_SUCCES)
-        self.lbl_emotie.pack(anchor="w", padx=15)
-
-        self.lbl_emotie_raw = tk.Label(cadru, text="", font=("Courier", 9),
-                                       bg=CULOARE_CARD, fg=CULOARE_TEXT_SECUNDAR)
-        self.lbl_emotie_raw.pack(anchor="w", padx=15, pady=(0, 8))
-
-        self.bara_emotie, self.bara_emotie_bg = self._bara_progres(cadru, CULOARE_SUCCES, (0, 12))
-
-    def _card_alerte(self, parinte):
-        cadru = self._card(parinte)
-        self._antet_card(cadru, "MONITORIZARE ALERTE", self.activ_alerte, CULOARE_ALERTA_1, (10, 8))
-
-        self.lbl_pct_disconfort = self._rand_alerta(cadru, "Disconfort / Durere sustinut(a)")
-        self.bara_disconfort, self.bara_disconfort_bg = self._bara_progres(
-            cadru, CULOARE_TEXT_LABEL, (2, 10))
-
-        self.lbl_pct_urgenta = self._rand_alerta(cadru, "Semnal de urgenta sustinut")
-        self.bara_urgenta, self.bara_urgenta_bg = self._bara_progres(
-            cadru, CULOARE_TEXT_LABEL, (2, 12))
-
-    @staticmethod
-    def _rand_alerta(cadru, eticheta):
-        rand = tk.Frame(cadru, bg=CULOARE_CARD)
-        rand.pack(fill="x", padx=15)
-        tk.Label(rand, text=eticheta, font=("Courier", 9),
-                 bg=CULOARE_CARD, fg=CULOARE_TEXT_SECUNDAR).pack(side="left")
-        lbl_pct = tk.Label(rand, text="0%", font=("Courier", 9, "bold"),
-                           bg=CULOARE_CARD, fg=CULOARE_TEXT_SECUNDAR)
-        lbl_pct.pack(side="right")
-        return lbl_pct
-
-    def _card_istoric(self, parinte):
-        cadru = self._card(parinte)
-        self._antet_card(cadru, "ISTORIC COMENZI", self.activ_istoric, CULOARE_ACCENT, (10, 6))
-
-        self.lbl_istoric = tk.Label(cadru, text="—", font=("Courier", 10),
-                                    bg=CULOARE_CARD, fg=CULOARE_TEXT_SECUNDAR,
-                                    wraplength=340, justify="left")
-        self.lbl_istoric.pack(anchor="w", padx=15, pady=(0, 12))
-
-    def _panou_setari(self, parinte):
-        cadru = self._card(parinte)
-
-        tk.Label(cadru, text="SETARI PACIENT", font=("Courier", 9, "bold"),
-                 bg=CULOARE_CARD, fg=CULOARE_TEXT_LABEL).pack(anchor="w", padx=15, pady=(10, 6))
-
-        def _slider(eticheta, variabila, val_min, val_max, format_val):
-            rand = tk.Frame(cadru, bg=CULOARE_CARD)
-            rand.pack(fill="x", padx=15, pady=(0, 8))
-
-            tk.Label(rand, text=eticheta, font=("Courier", 9), bg=CULOARE_CARD,
-                     fg=CULOARE_TEXT_SECUNDAR, width=22, anchor="w").pack(side="left")
-
-            lbl_val = tk.Label(rand, text=format_val(variabila.get()),
-                               font=("Courier", 9, "bold"),
-                               bg=CULOARE_CARD, fg=CULOARE_ACCENT, width=6, anchor="e")
-            lbl_val.pack(side="right")
-
-            variabila.trace_add("write", lambda *_: lbl_val.config(text=format_val(variabila.get())))
-
-            tk.Scale(rand, variable=variabila,
-                     from_=val_min, to=val_max, resolution=(val_max - val_min) / 100,
-                     orient="horizontal", showvalue=False,
-                     bg=CULOARE_CARD, fg=CULOARE_ACCENT,
-                     highlightthickness=0, troughcolor=CULOARE_SEPARATOR,
-                     activebackground=CULOARE_ACCENT
-                     ).pack(side="left", fill="x", expand=True, padx=(8, 8))
-
-        _slider("Incredere minima gest", self.var_prag_gest, 0.50, 0.95, lambda v: f"{v:.0%}")
-        _slider("Timp confirmare (sec)", self.var_timp_confirmare, 1.0, 5.0, lambda v: f"{v:.1f}s")
-        _slider("Timp alerta (sec)", self.var_prag_alerta, 3.0, 15.0, lambda v: f"{v:.0f}s")
-
-        tk.Frame(cadru, bg=CULOARE_BORDURA, height=1).pack(fill="x", padx=15)
-
-        tk.Button(cadru, text="Reseteaza valorile implicite",
-                  font=("Courier", 8), bg=CULOARE_CARD, fg=CULOARE_TEXT_SECUNDAR,
-                  activebackground=CULOARE_SEPARATOR, activeforeground=CULOARE_ACCENT,
-                  bd=0, padx=10, pady=6, cursor="hand2",
-                  command=self._reseteaza_setari).pack(anchor="e", padx=15, pady=8)
 
     def _reseteaza_setari(self):
         self.var_prag_gest.set(PRAG_INCREDERE_GEST)
@@ -325,9 +178,9 @@ class Aplicatie:
 
         if self.istoric_comenzi:
             self.istoric_comenzi.pop()
-            print("[!] Ultima comanda a fost stearsa, iar alertele au fost oprite.")
+            log.info("Ultima comanda a fost stearsa, iar alertele au fost oprite.")
         else:
-            print("[!] Istoric gol. Nu exista comenzi de anulat.")
+            log.info("Istoric gol. Nu exista comenzi de anulat.")
 
     #LOOP PRINCIPAL
     def _update(self):
@@ -377,10 +230,10 @@ class Aplicatie:
     def _proceseaza_gest(self, frame, now, stare_afisata):
         self.gest_curent = None
         if self.activ_gest.get():
-            landmarks, gest, incredere = self.detector_gesturi.proceseaza_cadru(frame)
-            if landmarks is not None and incredere > self.var_prag_gest.get():
-                repere_mana.deseneaza(frame, landmarks)
-                self.gest_curent = gest
+            rezultat = self.detector_gesturi.proceseaza_cadru(frame)
+            if rezultat and rezultat.incredere > self.var_prag_gest.get():
+                deseneaza_mana(frame, rezultat.landmarks)
+                self.gest_curent = rezultat.gest
         else:
             self.confirmare_gest.reseteaza()
 
@@ -409,7 +262,7 @@ class Aplicatie:
         elif nou:
             self.ultimul_rezultat_emotie = rezultat
             if rezultat:
-                self.istoric_emotii.append(rezultat['stare'])
+                self.istoric_emotii.append(rezultat.stare)
                 self.ultima_detectie_fata = now
 
         if now - self.ultima_detectie_fata > GRACE_FATA:
@@ -421,16 +274,16 @@ class Aplicatie:
             return
 
         culoare_bgr, culoare_hex = ClasificatorEmotii.CULORI_STARI[self.stare_pacient]
-        x, y, w, h = res['box']
+        x, y, w, h = res.box
         cv2.rectangle(frame, (x, y), (x + w, y + h), culoare_bgr, 2, cv2.LINE_AA)
         cv2.rectangle(frame, (x, y - 30), (x + w, y), culoare_bgr, -1)
-        cv2.putText(frame, f"{self.stare_pacient} ({res['incredere'] * 100:.0f}%)", (x + 5, y - 8),
+        cv2.putText(frame, f"{self.stare_pacient} ({res.incredere * 100:.0f}%)", (x + 5, y - 8),
                     cv2.FONT_HERSHEY_SIMPLEX, 0.50,
                     (0, 0, 0) if culoare_bgr != (0, 0, 255) else (255, 255, 255), 2, cv2.LINE_AA)
 
-        stare_afisata["emotie_ro"] = f"{self.stare_pacient} ({res['emotie_ro']})"
+        stare_afisata["emotie_ro"] = f"{self.stare_pacient} ({res.emotie_ro})"
         stare_afisata["emotie_hex"] = culoare_hex
-        stare_afisata["incredere_emotie"] = res['incredere']
+        stare_afisata["incredere_emotie"] = res.incredere
 
     def _proceseaza_alerte(self, now):
         if not self.activ_alerte.get():
@@ -442,7 +295,7 @@ class Aplicatie:
         progres_urgenta, anunta_urgenta = self.urgenta.actualizeaza(
             self.gest_curent == ClasificatorGesturi.GEST_URGENTA, now, prag)
         progres_disconfort, anunta_disconfort = self.disconfort.actualizeaza(
-            self.stare_pacient in STARI_DISCONFORT, now, prag)
+            self.stare_pacient in ClasificatorEmotii.STARI_DISCONFORT, now, prag)
 
         if anunta_urgenta:
             self.tts.roteste_prioritar(MESAJ_URGENTA)
@@ -454,25 +307,20 @@ class Aplicatie:
     def _update_ui(self, stare, progres_disconfort, progres_urgenta):
         self.lbl_gest.config(text=stare["comanda"])
         self.lbl_conf_gest.config(text=f"{stare['progres_gest'] * 100:.0f}%")
-        culoare_bara_gest = CULOARE_SUCCES if stare['progres_gest'] >= 1.0 else CULOARE_ACCENT
-        self.bara_gest.config(bg=culoare_bara_gest)
-        self.bara_gest.place(width=int(stare['progres_gest'] * self.bara_gest_bg.winfo_width()))
+        self.bara_gest.seteaza(stare['progres_gest'],
+                               CULOARE_SUCCES if stare['progres_gest'] >= 1.0 else CULOARE_ACCENT)
 
         self.lbl_emotie.config(text=stare["emotie_ro"], fg=stare["emotie_hex"])
         self.lbl_emotie_raw.config(text=f"Incredere model: {stare['incredere_emotie'] * 100:.0f}%")
-        self.bara_emotie.config(bg=stare["emotie_hex"])
-        self.bara_emotie.place(width=int(stare['incredere_emotie'] * self.bara_emotie_bg.winfo_width()))
+        self.bara_emotie.seteaza(stare['incredere_emotie'], stare["emotie_hex"])
 
-        self._seteaza_bara_alerta(self.bara_disconfort, self.bara_disconfort_bg,
-                                  self.lbl_pct_disconfort, progres_disconfort, self.disconfort.activa)
-        self._seteaza_bara_alerta(self.bara_urgenta, self.bara_urgenta_bg,
-                                  self.lbl_pct_urgenta, progres_urgenta, self.urgenta.activa)
+        self.indicator_disconfort.seteaza(progres_disconfort, self.disconfort.activa)
+        self.indicator_urgenta.seteaza(progres_urgenta, self.urgenta.activa)
 
         flash = int(time.time() * 2) % 2 == 0
         culoare_banner = CULOARE_ALERTA_1 if flash else CULOARE_ALERTA_2
         if self.urgenta.activa:
-            self.lbl_banner.config(text="CRITICAL: semnal de urgenta sustinut",
-                                   bg=culoare_banner, fg="white")
+            self.lbl_banner.config(text="CRITICAL: semnal de urgenta sustinut", bg=culoare_banner, fg="white")
         elif self.disconfort.activa:
             self.lbl_banner.config(
                 text=f"ALERTA: disconfort sustinut de peste {self.var_prag_alerta.get():.0f} secunde",
@@ -488,26 +336,22 @@ class Aplicatie:
 
         self.lbl_fps.config(text=f"FPS: {self.fps:.0f}")
 
-    @staticmethod
-    def _seteaza_bara_alerta(bara, bara_bg, label_pct, progres, activa):
-        culoare = CULOARE_ALERTA_1 if activa else (CULOARE_AVERTIZARE if progres > 0 else CULOARE_TEXT_LABEL)
-        bara.config(bg=culoare)
-        bara.place(width=int(progres * bara_bg.winfo_width()))
-        label_pct.config(text=f"{progres * 100:.0f}%", fg=culoare)
-
     def _inchide(self):
         self.activ = False
         if self.id_bucla is not None:
             self.root.after_cancel(self.id_bucla)
         self.cap.release()
-        self.detector_gesturi.inchide()
         self.analiza_emotii.opreste()
+        self.detector_emotii.inchide()
+        self.detector_gesturi.inchide()
         self.tts.opreste()
         self.root.destroy()
 
 
-if __name__ == "__main__":
+def main():
     from src.ecran_pornire import EcranPornire
+
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s")
 
     root = tk.Tk()
     root.withdraw()
@@ -516,5 +360,9 @@ if __name__ == "__main__":
         root.deiconify()
         Aplicatie(root)
 
-    EcranPornire(root, porneste_aplicatia, prag_alerta=PRAG_ALERTA)
+    EcranPornire(root, porneste_aplicatia)
     root.mainloop()
+
+
+if __name__ == "__main__":
+    main()

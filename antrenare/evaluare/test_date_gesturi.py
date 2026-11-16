@@ -1,4 +1,5 @@
 import json
+import sys
 from pathlib import Path
 
 import matplotlib.pyplot as plt
@@ -6,17 +7,17 @@ import numpy as np
 import pandas as pd
 import seaborn as sns
 import tensorflow as tf
-from sklearn.metrics import confusion_matrix, classification_report
+from sklearn.metrics import classification_report, confusion_matrix
 
-DIR_PROIECT = Path(__file__).resolve().parent.parent
-DIR_MODELE = DIR_PROIECT / "modele"
-DIR_ANTRENARE = DIR_PROIECT / "antrenare"
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+
+from src.config import DIR_ANTRENARE, MAPARE_GESTURI, MODEL_GESTURI
 
 print("Se incarca modelul si datele...")
 
 #incarcare+mapare gesturi
-model = tf.keras.models.load_model(DIR_MODELE / "model_gesturi.h5")
-with open(DIR_MODELE / "mapare_gesturi.json") as f:
+model = tf.keras.models.load_model(MODEL_GESTURI)
+with open(MAPARE_GESTURI) as f:
     mapare = json.load(f)
 
 #sortare gesturi

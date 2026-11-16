@@ -1,13 +1,15 @@
-import pandas as pd
-import matplotlib.pyplot as plt
-import matplotlib.gridspec as gridspec
-import numpy as np
 import os
+import sys
 from pathlib import Path
 
-DIR_PROIECT = Path(__file__).resolve().parent.parent
-DIR_ANTRENARE = DIR_PROIECT / "antrenare"
+import matplotlib.gridspec as gridspec
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
 
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+
+from src.config import DIR_ANTRENARE
 
 GESTURI = ["pumn_inchis", "palma_deschisa", "unu", "doi", "trei", "ok"]
 
@@ -49,7 +51,7 @@ ax1.xaxis.label.set_color('white')
 ax1.yaxis.label.set_color('white')
 for spine in ax1.spines.values():
     spine.set_edgecolor('#30363d')
-for bar, val in zip(bars, nr_exemple):
+for bar, val in zip(bars, nr_exemple, strict=True):
     ax1.text(bar.get_x() + bar.get_width()/2, bar.get_height() + 3,
              str(val), ha='center', va='bottom', fontsize=9, color='white')
 
@@ -69,7 +71,7 @@ ax2.yaxis.label.set_color('white')
 plt.setp(ax2.xaxis.get_majorticklabels(), rotation=30, ha='right')
 for spine in ax2.spines.values():
     spine.set_edgecolor('#30363d')
-for bar, val in zip(bars2, nr_imagini_train):
+for bar, val in zip(bars2, nr_imagini_train, strict=True):
     ax2.text(bar.get_x() + bar.get_width()/2, bar.get_height() + 10,
              str(val), ha='center', va='bottom', fontsize=8, color='white')
 

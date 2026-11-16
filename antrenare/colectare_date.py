@@ -6,8 +6,8 @@ import cv2
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from src import repere_mana
 from src.config import DIR_ANTRENARE
+from src.detectoare import DetectorMana, deseneaza_mana, normalizeaza_mana
 
 #config
 GESTURI = ["pumn_inchis", "palma_deschisa", "unu", "doi", "trei", "ok"]
@@ -31,7 +31,7 @@ def degete_ridicate(hand_landmarks):
     #feedback vizual
     varfuri = [8, 12, 16, 20]
     baze = [6, 10, 14, 18]
-    return [hand_landmarks[varf].y < hand_landmarks[baza].y for varf, baza in zip(varfuri, baze)]
+    return [hand_landmarks[varf].y < hand_landmarks[baza].y for varf, baza in zip(varfuri, baze, strict=True)]
 
 
 def gest_valid(gest, degete):
@@ -46,7 +46,7 @@ def gest_valid(gest, degete):
 
 
 def afiseaza_degete(frame, degete):
-    for i, (ridicat, nume) in enumerate(zip(degete, NUME_DEGETE)):
+    for i, (ridicat, nume) in enumerate(zip(degete, NUME_DEGETE, strict=True)):
         culoare = (0, 255, 0) if ridicat else (0, 0, 255)
         cv2.putText(frame, f"{nume}: {'SUS' if ridicat else 'JOS'}", (10, 160 + i * 25),
                     cv2.FONT_HERSHEY_SIMPLEX, 0.55, culoare, 1)
@@ -76,7 +76,7 @@ def asteapta_start(cap, detector, index_gest, gest):
                     (10, 105), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (200, 200, 0), 1)
 
         if landmarks is not None:
-            repere_mana.deseneaza(frame, landmarks)
+            deseneaza_mana(frame, landmarks)
             afiseaza_degete(frame, degete_ridicate(landmarks))
 
         cv2.imshow("Colectare date", frame)
@@ -103,10 +103,10 @@ def colecteaza(cap, detector, gest):
                 degete = degete_ridicate(landmarks)
                 valid = gest_valid(gest, degete)
                 if valid:
-                    writer.writerow(repere_mana.normalizeaza(landmarks))
+                    writer.writerow(normalizeaza_mana(landmarks))
                     exemple_colectate += 1
 
-                repere_mana.deseneaza(frame, landmarks)
+                deseneaza_mana(frame, landmarks)
 
                 #feedback culoare: verde=valid, rosu=invalid
                 culoare_status = (0, 255, 0) if valid else (0, 0, 255)
@@ -129,7 +129,7 @@ def colecteaza(cap, detector, gest):
 
 def main():
     DIR_DATE.mkdir(parents=True, exist_ok=True)
-    detector = repere_mana.DetectorMana(incredere=0.7)
+    detector = DetectorMana(incredere=0.7)
     cap = cv2.VideoCapture(0)
 
     try:

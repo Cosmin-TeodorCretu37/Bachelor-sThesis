@@ -1,22 +1,16 @@
-import pandas as pd
-import matplotlib.pyplot as plt
-import numpy as np
+import sys
 from pathlib import Path
 
-DIR_PROIECT = Path(__file__).resolve().parent.parent
-DIR_ANTRENARE = DIR_PROIECT / "antrenare"
+import matplotlib.pyplot as plt
+import pandas as pd
 
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+
+from src.config import DIR_ANTRENARE
+from src.detectoare import CONEXIUNI_PALMA
 
 GESTURI =["pumn_inchis","palma_deschisa", "unu", "doi", "trei", "ok"]
 
-HAND_CONNECTIONS = [
-    (0,1),(1,2),(2,3),(3,4),
-    (0,5),(5,6),(6,7),(7,8),
-    (0,9),(9,10),(10,11),(11,12),
-    (0,13),(13,14),(14,15),(15,16),
-    (0,17),(17,18),(18,19),(19,20),
-    (5,9),(9,13),(13,17)
-]
 
 fig, axs =plt.subplots(2, 3, figsize=(14, 9))
 fig.patch.set_facecolor('#0d1117')
@@ -38,7 +32,7 @@ def culoare_punct(idx):
             return c
     return 'white'
 
-for ax, gest in zip(axs.flat, GESTURI):
+for ax, gest in zip(axs.flat, GESTURI, strict=True):
     ax.set_facecolor('#161b22')
     ax.set_title(gest.replace("_", " ").upper(),
                  fontsize=10, fontweight='bold', color='#58a6ff', pad=6)
@@ -57,7 +51,7 @@ for ax, gest in zip(axs.flat, GESTURI):
         xs =puncte[:, 0]
         ys = puncte[:, 1]
 
-        for start,end in HAND_CONNECTIONS:
+        for start,end in CONEXIUNI_PALMA:
             ax.plot([xs[start], xs[end]], [ys[start], ys[end]],
                    color='#30363d', linewidth=1.5, alpha=0.6, zorder=1)
 
@@ -69,7 +63,7 @@ for ax, gest in zip(axs.flat, GESTURI):
     medie= df.mean().values.reshape(21, 3)
     xs_m, ys_m =medie[:, 0], medie[:, 1]
 
-    for start, end in HAND_CONNECTIONS:
+    for start, end in CONEXIUNI_PALMA:
         ax.plot([xs_m[start], xs_m[end]], [ys_m[start], ys_m[end]],
                color='white', linewidth=2, zorder=3)
     for i in range(21):

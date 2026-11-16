@@ -1,6 +1,9 @@
 import tkinter as tk
 
 from src.clasificator_gesturi import ClasificatorGesturi
+from src.config import CULOARE_ACCENT, CULOARE_BORDURA, CULOARE_CARD, CULOARE_FUNDAL, PRAG_ALERTA
+from src.config import CULOARE_ALERTA_1 as CULOARE_URGENTA
+from src.config import CULOARE_TEXT_SECUNDAR as CULOARE_GRI
 
 GESTURI_GHID = [
     ("Pumn inchis", 'pumn_inchis', "#f85149"),
@@ -11,17 +14,10 @@ GESTURI_GHID = [
     ("Palma deschisa", 'palma_deschisa', "#8b949e"),
 ]
 
-CULOARE_FUNDAL = "#0d1117"
-CULOARE_CARD = "#161b22"
-CULOARE_BORDURA = "#30363d"
-CULOARE_ACCENT = "#58a6ff"
-CULOARE_GRI = "#8b949e"
-CULOARE_URGENTA = "#f85149"
-
 
 class EcranPornire(tk.Toplevel):
 
-    def __init__(self, root, callback_pornire, prag_alerta=7.0):
+    def __init__(self, root, callback_pornire, prag_alerta=PRAG_ALERTA):
         super().__init__(root)
         self.root_ref = root
         self.callback_pornire = callback_pornire

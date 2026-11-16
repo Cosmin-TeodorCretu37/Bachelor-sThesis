@@ -1,22 +1,23 @@
 import json
+import sys
 from pathlib import Path
 
 import matplotlib.pyplot as plt
 import numpy as np
 import seaborn as sns
 import tensorflow as tf
-from sklearn.metrics import confusion_matrix, classification_report
+from sklearn.metrics import classification_report, confusion_matrix
 from tensorflow import keras
 
-DIR_PROIECT = Path(__file__).resolve().parent.parent
-DIR_MODELE = DIR_PROIECT / "modele"
-DIR_ANTRENARE = DIR_PROIECT / "antrenare"
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+
+from src.config import DIR_ANTRENARE, MAPARE_EMOTII, MODEL_EMOTII
 
 print("Se incarca modelul si datele...")
 
 #incarcare model si mapare
-model = tf.keras.models.load_model(DIR_MODELE / "model_emotii_best.h5")
-with open(DIR_MODELE / "mapare_emotii.json") as f:
+model = tf.keras.models.load_model(MODEL_EMOTII)
+with open(MAPARE_EMOTII) as f:
     mapare = json.load(f)
 
 idx_to_emotie = {v: k for k, v in mapare.items()}

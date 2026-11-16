@@ -1,7 +1,10 @@
+import logging
 import queue
 import threading
 
 import pyttsx3
+
+log = logging.getLogger(__name__)
 
 
 class SintezaVocala:
@@ -15,7 +18,7 @@ class SintezaVocala:
     @staticmethod
     def _gaseste_voce_engleza(engine):
         for voce in engine.getProperty('voices'):
-            limbi = " ".join(str(l) for l in getattr(voce, 'languages', []) or []).lower()
+            limbi = " ".join(str(limba) for limba in getattr(voce, 'languages', []) or []).lower()
             nume = (voce.name or "").lower()
             id_voce = (voce.id or "").lower()
             if "english" in nume or "en-" in id_voce or "en_" in id_voce or limbi.startswith("en"):
@@ -47,8 +50,8 @@ class SintezaVocala:
                 engine.runAndWait()
                 engine.stop()
                 del engine
-            except Exception as e:
-                print(f"[TTS] Eroare la redarea mesajului: {e}")
+            except Exception:
+                log.exception("Eroare la redarea mesajului vocal")
             finally:
                 self.coada_mesaje.task_done()
 
