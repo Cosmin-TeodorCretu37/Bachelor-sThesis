@@ -1,29 +1,33 @@
-import numpy as np
-import tensorflow as tf
 import json
+from pathlib import Path
+
 import matplotlib.pyplot as plt
+import numpy as np
 import seaborn as sns
+import tensorflow as tf
 from sklearn.metrics import confusion_matrix, classification_report
 from tensorflow import keras
-import os
+
+DIR_PROIECT = Path(__file__).resolve().parent.parent
+DIR_MODELE = DIR_PROIECT / "modele"
+DIR_ANTRENARE = DIR_PROIECT / "antrenare"
 
 print("Se incarca modelul si datele...")
 
 #incarcare model si mapare
-model = tf.keras.models.load_model('model_emotii/model_emotii_best.h5')
-with open('model_emotii/mapare_emotii.json') as f:
+model = tf.keras.models.load_model(DIR_MODELE / "model_emotii_best.h5")
+with open(DIR_MODELE / "mapare_emotii.json") as f:
     mapare = json.load(f)
 
-idx_to_emotie ={v: k for k, v in mapare.items()}
-EMOTII =[idx_to_emotie[i] for i in range(len(mapare))]
+idx_to_emotie = {v: k for k, v in mapare.items()}
+EMOTII = [idx_to_emotie[i] for i in range(len(mapare))]
 
 #incarcare date test din FER2013
 IMG_SIZE = 48
-DATA_DIR = "fer2013/test"
 
-test_datagen =keras.preprocessing.image.ImageDataGenerator(rescale=1./255)
+test_datagen = keras.preprocessing.image.ImageDataGenerator(rescale=1./255)
 test_generator = test_datagen.flow_from_directory(
-    DATA_DIR,
+    DIR_ANTRENARE / "fer2013" / "test",
     target_size=(IMG_SIZE, IMG_SIZE),
     batch_size=32,
     color_mode='grayscale',
@@ -33,7 +37,7 @@ test_generator = test_datagen.flow_from_directory(
 
 print("Se genereaza predictiile...")
 probabilitati = model.predict(test_generator, verbose=1)
-predictii= np.argmax(probabilitati, axis=1)
+predictii = np.argmax(probabilitati, axis=1)
 etichete_reale = test_generator.classes
 
 #matrice de confuzie
@@ -41,17 +45,19 @@ cm = confusion_matrix(etichete_reale, predictii)
 etichete_display = [e.upper() for e in EMOTII]
 
 plt.figure(figsize=(10, 8))
-sns.heatmap(cm, annot=True, fmt='d', cmap='Greens',xticklabels=etichete_display,yticklabels=etichete_display,annot_kws={"size": 12})
+sns.heatmap(cm, annot=True, fmt='d', cmap='Greens', xticklabels=etichete_display,
+            yticklabels=etichete_display, annot_kws={"size": 12})
 plt.title('Matrice de Confuzie - Detectie Emotii', fontsize=16, pad=15)
-plt.xlabel('Predictia Modelului',fontsize=13, labelpad=12)
+plt.xlabel('Predictia Modelului', fontsize=13, labelpad=12)
 plt.ylabel('Emotia Reala', fontsize=13, labelpad=12)
 plt.xticks(rotation=45)
 plt.yticks(rotation=0)
 plt.tight_layout()
-plt.savefig('matrice_confuzie_emotii.png',dpi=300)
+cale_imagine = DIR_ANTRENARE / "matrice_confuzie_emotii.png"
+plt.savefig(cale_imagine, dpi=300)
 plt.show()
-print("Salvat: matrice_confuzie_emotii.png")
+print(f"Salvat: {cale_imagine}")
 
 #raport detaliat per clasa
 print('\nRAPORT PERFORMANTA EMOTII:')
-print(classification_report(etichete_reale, predictii,target_names=etichete_display))
+print(classification_report(etichete_reale, predictii, target_names=etichete_display))

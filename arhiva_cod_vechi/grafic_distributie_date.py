@@ -3,25 +3,30 @@ import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
 import numpy as np
 import os
+from pathlib import Path
+
+DIR_PROIECT = Path(__file__).resolve().parent.parent
+DIR_ANTRENARE = DIR_PROIECT / "antrenare"
+
 
 GESTURI = ["pumn_inchis", "palma_deschisa", "unu", "doi", "trei", "ok"]
 
 #numaram exemplele per gest
 nr_exemple= []
 for gest in GESTURI:
-    fisier = f"date_gesturi/{gest}.csv"
+    fisier = DIR_ANTRENARE / "date_gesturi" / f"{gest}.csv"
     df = pd.read_csv(fisier, header=None)
     nr_exemple.append(len(df))
 
 #numaram imaginile per emotie din FER2013
-EMOTII_FER = ['angry','disgusted', 'fearful', 'happy', 'neutral', 'sad', 'surprise']
+EMOTII_FER = ['angry', 'disgust', 'fear', 'happy', 'neutral', 'sad', 'surprise']
 emotii_ro = ['Furie', 'Dezgust', 'Frica','Bucurie', 'Neutru', 'Tristete', 'Surpriza']
 nr_imagini_train = []
 nr_imagini_test = []
 
 for emotie in EMOTII_FER:
-    folder_train= f"fer2013/train/{emotie}"
-    folder_test = f"fer2013/test/{emotie}"
+    folder_train = DIR_ANTRENARE / "fer2013" / "train" / emotie
+    folder_test = DIR_ANTRENARE / "fer2013" / "test" / emotie
     nr_imagini_train.append(len(os.listdir(folder_train)) if os.path.exists(folder_train) else 0)
     nr_imagini_test.append(len(os.listdir(folder_test)) if os.path.exists(folder_test) else 0)
 
@@ -97,6 +102,6 @@ ax4.yaxis.label.set_color('white')
 for spine in ax4.spines.values():
     spine.set_edgecolor('#30363d')
 
-plt.savefig('distributie_date.png',dpi=300, facecolor='#0d1117', bbox_inches='tight')
+plt.savefig(DIR_ANTRENARE / 'distributie_date.png',dpi=300, facecolor='#0d1117', bbox_inches='tight')
 plt.show()
-print("Salvat: distributie_date.png")
+print(f"Salvat: {DIR_ANTRENARE / 'distributie_date.png'}")

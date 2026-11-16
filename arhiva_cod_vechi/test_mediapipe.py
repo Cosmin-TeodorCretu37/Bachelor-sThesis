@@ -4,9 +4,10 @@ from mediapipe.tasks import python
 from mediapipe.tasks.python import vision
 import urllib.request
 import os
+from pathlib import Path
 
 #descarcare model
-model_path = "hand_landmarker.task"
+model_path = str(Path(__file__).resolve().parent.parent / "modele" / "hand_landmarker.task")
 if not os.path.exists(model_path):
     print("Se descarca modelul...")
     url= "https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/latest/hand_landmarker.task"

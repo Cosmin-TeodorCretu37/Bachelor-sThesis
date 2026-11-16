@@ -1,6 +1,11 @@
 import pandas as pd
 import matplotlib.pyplot as plt
 import numpy as np
+from pathlib import Path
+
+DIR_PROIECT = Path(__file__).resolve().parent.parent
+DIR_ANTRENARE = DIR_PROIECT / "antrenare"
+
 
 GESTURI =["pumn_inchis","palma_deschisa", "unu", "doi", "trei", "ok"]
 
@@ -43,7 +48,7 @@ for ax, gest in zip(axs.flat, GESTURI):
     ax.set_aspect('equal')
     ax.axis('off')
 
-    df = pd.read_csv(f"date_gesturi/{gest}.csv", header=None)
+    df = pd.read_csv(DIR_ANTRENARE / "date_gesturi" / f"{gest}.csv", header=None)
 
     #desenam primele 5 exemple suprapuse (transparenta)
     for _, rand in df.head(5).iterrows():
@@ -84,6 +89,6 @@ fig.legend(handles=legenda_items,loc='lower center', ncol=5,
            framealpha=0.8, bbox_to_anchor=(0.5, -0.02))
 
 plt.tight_layout()
-plt.savefig('vizualizare_landmarks.png', dpi=300, facecolor='#0d1117', bbox_inches='tight')
+plt.savefig(DIR_ANTRENARE / 'vizualizare_landmarks.png', dpi=300, facecolor='#0d1117', bbox_inches='tight')
 plt.show()
-print("Salvat: vizualizare_landmarks.png")
+print(f"Salvat: {DIR_ANTRENARE / 'vizualizare_landmarks.png'}")

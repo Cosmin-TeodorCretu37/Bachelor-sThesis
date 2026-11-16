@@ -1,13 +1,14 @@
 import tkinter as tk
 
+from src.clasificator_gesturi import ClasificatorGesturi
 
 GESTURI_GHID = [
-    ("Pumn inchis", "MEDICAL EMERGENCY!", "#f85149"),
-    ("Ok", "I need water.", "#58a6ff"),
-    ("Unu", "I am in pain.\nNeed painkillers.", "#f0883e"),
-    ("Doi", "Please call a nurse.", "#bc8cff"),
-    ("Trei","Adjust the bed, please.", "#3fb950"),
-    ("Palma deschisa", "Cancel command.", "#8b949e"),
+    ("Pumn inchis", 'pumn_inchis', "#f85149"),
+    ("Ok", 'ok', "#58a6ff"),
+    ("Unu", 'unu', "#f0883e"),
+    ("Doi", 'doi', "#bc8cff"),
+    ("Trei", 'trei', "#3fb950"),
+    ("Palma deschisa", 'palma_deschisa', "#8b949e"),
 ]
 
 CULOARE_FUNDAL = "#0d1117"
@@ -20,10 +21,11 @@ CULOARE_URGENTA = "#f85149"
 
 class EcranPornire(tk.Toplevel):
 
-    def __init__(self, root, callback_pornire):
+    def __init__(self, root, callback_pornire, prag_alerta=7.0):
         super().__init__(root)
         self.root_ref = root
         self.callback_pornire = callback_pornire
+        self.prag_alerta = prag_alerta
 
         self.title("Sistem Medical Asistiv - Ghid de utilizare")
         self.geometry("820x640")
@@ -75,9 +77,10 @@ class EcranPornire(tk.Toplevel):
         for col in range(3):
             grid.columnconfigure(col, weight=1, uniform="col")
 
-        for i, (nume, comanda, culoare) in enumerate(GESTURI_GHID):
+        for i, (nume, gest, culoare) in enumerate(GESTURI_GHID):
             rand = i // 3
             col  = i % 3
+            comanda = ClasificatorGesturi.COMENZI_MEDICALE[gest]
             self._card_gest(grid, nume, comanda, culoare).grid(
                 row=rand, column=col, padx=6, pady=6, sticky="nsew"
             )
@@ -90,7 +93,7 @@ class EcranPornire(tk.Toplevel):
 
         tk.Label(
             nota,
-            text="URGENTA: tineti pumnul inchis continuu timp de 7 secunde "
+            text=f"URGENTA: tineti pumnul inchis continuu timp de {self.prag_alerta:.0f} secunde "
                  "pentru a activa alarma de urgenta cu sinteza vocala automata.",
             font=("Courier", 9),
             bg=CULOARE_CARD, fg=CULOARE_URGENTA,

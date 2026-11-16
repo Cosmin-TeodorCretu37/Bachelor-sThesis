@@ -1,15 +1,18 @@
-import numpy as np
-import tensorflow as tf
-from tensorflow import keras
-import matplotlib.pyplot as plt
-import os
 import json
+from pathlib import Path
+
+import matplotlib.pyplot as plt
+from tensorflow import keras
+
+DIR_PROIECT = Path(__file__).resolve().parent.parent
+DIR_DATE = DIR_PROIECT / "antrenare" / "fer2013"
+DIR_MODELE = DIR_PROIECT / "modele"
 
 #parametri generali
 IMG_SIZE = 48
 BATCH_SIZE = 32
 EPOCHS = 50
-DATA_DIR ="fer2013"
+PROCENT_VALIDARE = 0.1
 
 #augmentare date antrenare
 #generam variante ale imaginilor (rotite, oglindite, zoom)
@@ -19,60 +22,68 @@ train_datagen = keras.preprocessing.image.ImageDataGenerator(
     width_shift_range=0.1,
     height_shift_range=0.1,
     horizontal_flip=True,
-    zoom_range=0.1
+    zoom_range=0.1,
+    validation_split=PROCENT_VALIDARE
 )
 
-#datele de test doar se normalizeaza
-test_datagen=keras.preprocessing.image.ImageDataGenerator(
+#datele de validare si test doar se normalizeaza
+val_datagen = keras.preprocessing.image.ImageDataGenerator(
+    rescale=1./255,
+    validation_split=PROCENT_VALIDARE
+)
+test_datagen = keras.preprocessing.image.ImageDataGenerator(
     rescale=1./255
 )
 
 #incarcare imagini
-train_generator = train_datagen.flow_from_directory(
-    os.path.join(DATA_DIR, "train"),
+parametri_comuni = dict(
     target_size=(IMG_SIZE, IMG_SIZE),
     batch_size=BATCH_SIZE,
     color_mode='grayscale',  #fer2013 e alb-negru
     class_mode='categorical'
 )
 
+train_generator = train_datagen.flow_from_directory(
+    DIR_DATE / "train", subset='training', **parametri_comuni
+)
+val_generator = val_datagen.flow_from_directory(
+    DIR_DATE / "train", subset='validation', shuffle=False, **parametri_comuni
+)
 test_generator = test_datagen.flow_from_directory(
-    os.path.join(DATA_DIR, "test"),
-    target_size=(IMG_SIZE, IMG_SIZE),
-    batch_size=BATCH_SIZE,
-    color_mode='grayscale',
-    class_mode='categorical'
+    DIR_DATE / "test", shuffle=False, **parametri_comuni
 )
 
 print(f"\nClase detectate: {train_generator.class_indices}")
 print(f"Imagini antrenare: {train_generator.samples}")
+print(f"Imagini validare: {val_generator.samples}")
 print(f"Imagini test: {test_generator.samples}")
 
 #arhitectura CNN
 #spre deosebire de gesturi (unde aveam coordonate numerice),
 #aici lucram cu imagini, deci folosim straturi Conv2D
 model = keras.Sequential([
+    keras.layers.Input(shape=(IMG_SIZE, IMG_SIZE, 1)),
+
     #bloc1: trasaturi simple (muchii, linii)
-    keras.layers.Conv2D(32, (3,3), activation='relu',
-                        input_shape=(IMG_SIZE, IMG_SIZE, 1)),
+    keras.layers.Conv2D(32, (3, 3), activation='relu'),
     keras.layers.BatchNormalization(), #stabilizeaza antrenarea
-    keras.layers.Conv2D(32, (3,3), activation='relu'),
+    keras.layers.Conv2D(32, (3, 3), activation='relu'),
     keras.layers.BatchNormalization(),
-    keras.layers.MaxPooling2D(2,2),  #reduce dimensiunea la jumatate
+    keras.layers.MaxPooling2D(2, 2),  #reduce dimensiunea la jumatate
     keras.layers.Dropout(0.25),
 
     #bloc2:trasaturi complexe (ochi, gura, sprancene)
-    keras.layers.Conv2D(64,(3,3), activation='relu'),
+    keras.layers.Conv2D(64, (3, 3), activation='relu'),
     keras.layers.BatchNormalization(),
-    keras.layers.Conv2D(64, (3,3), activation='relu'),
+    keras.layers.Conv2D(64, (3, 3), activation='relu'),
     keras.layers.BatchNormalization(),
-    keras.layers.MaxPooling2D(2,2),
+    keras.layers.MaxPooling2D(2, 2),
     keras.layers.Dropout(0.25),
 
     #bloc3: trasaturi abstracte (combinatii de expresii)
-    keras.layers.Conv2D(128,(3,3), activation='relu', padding='same'),
+    keras.layers.Conv2D(128, (3, 3), activation='relu', padding='same'),
     keras.layers.BatchNormalization(),
-    keras.layers.MaxPooling2D(2,2),
+    keras.layers.MaxPooling2D(2, 2),
     keras.layers.Dropout(0.25),
 
     #trecem de la 2D la 1D pentru clasificare
@@ -84,12 +95,11 @@ model = keras.Sequential([
     keras.layers.Dropout(0.5),
 
     #strat iesire: 7 emotii
-    keras.layers.Dense(7,activation='softmax')
+    keras.layers.Dense(7, activation='softmax')
 ])
 
 model.summary()
 
-#compilare
 model.compile(
     optimizer=keras.optimizers.Adam(learning_rate=0.001),
     loss='categorical_crossentropy',
@@ -97,10 +107,10 @@ model.compile(
 )
 
 #callbacks (mecanisme care controleaza antrenarea automat)
-os.makedirs("model_emotii",exist_ok=True)
+DIR_MODELE.mkdir(exist_ok=True)
 
 #opreste antrenarea daca nu se imbunateste in 10 epoci
-early_stopping =keras.callbacks.EarlyStopping(
+early_stopping = keras.callbacks.EarlyStopping(
     monitor='val_accuracy',
     patience=10,
     restore_best_weights=True
@@ -115,35 +125,32 @@ reduce_lr = keras.callbacks.ReduceLROnPlateau(
 )
 
 #salveaza automat cel mai bun model
-checkpoint =keras.callbacks.ModelCheckpoint(
-    "model_emotii/model_emotii_best.h5",
+checkpoint = keras.callbacks.ModelCheckpoint(
+    str(DIR_MODELE / "model_emotii_best.h5"),
     monitor='val_accuracy',
     save_best_only=True,
     verbose=1
 )
 
-#antrenare
 print("\nIncepe antrenarea... (poate dura 10-20 minute)")
 
-history= model.fit(
+history = model.fit(
     train_generator,
     epochs=EPOCHS,
-    validation_data=test_generator,
+    validation_data=val_generator,
     callbacks=[early_stopping, reduce_lr, checkpoint],
     verbose=1
 )
 
 #evaluare
-loss, accuracy =model.evaluate(test_generator, verbose=0)
+loss, accuracy = model.evaluate(test_generator, verbose=0)
 print(f"\nAcuratete finala pe test: {accuracy * 100:.1f}%")
 
-#salvare model si mapare emotii
-model.save("model_emotii/model_emotii.h5")
-
-with open("model_emotii/mapare_emotii.json", "w") as f:
+#salvare mapare emotii
+with open(DIR_MODELE / "mapare_emotii.json", "w") as f:
     json.dump(train_generator.class_indices, f, indent=2)
 
-print("Model salvat in 'model_emotii/'")
+print(f"Model si mapare salvate in '{DIR_MODELE}'")
 
 #grafic acuratete
 plt.figure(figsize=(10, 4))
@@ -165,6 +172,6 @@ plt.ylabel('Loss')
 plt.legend()
 
 plt.tight_layout()
-plt.savefig("model_emotii/grafic_antrenare_emotii.png")
+plt.savefig(DIR_MODELE / "grafic_antrenare_emotii.png")
 plt.show()
-print("Grafic salvat in 'model_emotii/grafic_antrenare_emotii.png'")
+print(f"Grafic salvat in '{DIR_MODELE / 'grafic_antrenare_emotii.png'}'")
