@@ -1,11 +1,10 @@
 import json
-from pathlib import Path
 
 import cv2
 import numpy as np
 import tensorflow as tf
 
-DIR_MODELE = Path(__file__).resolve().parent.parent / "modele"
+from src.config import DIR_MODELE
 
 
 class ClasificatorEmotii:
@@ -35,16 +34,13 @@ class ClasificatorEmotii:
         'Discomfort': ((0, 0, 255), '#f85149'),
     }
 
-    PRAG_SIGURANTA_FURIE = 0.65
     SCALA_DETECTIE = 0.5
 
     def __init__(self, calea_model=DIR_MODELE / "model_emotii_best.h5",
                  calea_mapare=DIR_MODELE / "mapare_emotii.json"):
         self.model = tf.keras.models.load_model(calea_model)
         with open(calea_mapare) as f:
-            self.mapare = json.load(f)
-
-        self.idx_la_emotie = {int(v): k for k, v in self.mapare.items()}
+            self.idx_la_emotie = {int(v): k for k, v in json.load(f).items()}
 
         self.detectie_fata = cv2.CascadeClassifier(
             cv2.data.haarcascades + 'haarcascade_frontalface_default.xml'
@@ -56,14 +52,7 @@ class ClasificatorEmotii:
 
         procente = self.model(fata_input, training=False).numpy()[0]
         max_idx = int(np.argmax(procente))
-        emotie_raw = self.idx_la_emotie[max_idx]
-        incredere = float(procente[max_idx])
-
-        if emotie_raw == 'angry' and incredere < self.PRAG_SIGURANTA_FURIE:
-            emotie_raw = 'neutral'
-            incredere = max(float(procente[self.mapare['neutral']]), 0.50)
-
-        return emotie_raw, incredere
+        return self.idx_la_emotie[max_idx], float(procente[max_idx])
 
     def detecteaza_fata(self, gri):
         gri_mic = cv2.resize(gri, None, fx=self.SCALA_DETECTIE, fy=self.SCALA_DETECTIE)
@@ -83,10 +72,10 @@ class ClasificatorEmotii:
             return None
 
         x, y, w, h = box
-        emotie_raw, incredere = self.predictie(gri[y:y + h, x:x + w])
+        emotie, incredere = self.predictie(gri[y:y + h, x:x + w])
         return {
             'box': box,
-            'emotie_ro': self.EMOTII_RO[emotie_raw],
-            'stare': self.STARI_CLINICE[emotie_raw],
+            'emotie_ro': self.EMOTII_RO[emotie],
+            'stare': self.STARI_CLINICE[emotie],
             'incredere': incredere,
         }

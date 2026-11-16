@@ -8,6 +8,8 @@ from PIL import Image, ImageTk
 from src import repere_mana
 from src.clasificator_emotii import ClasificatorEmotii
 from src.clasificator_gesturi import ClasificatorGesturi
+from src.monitorizare import ConfirmareGest, StareSustinuta
+from src.procesare_fundal import ProcesareFundal
 from src.sinteza_vocala import SintezaVocala
 
 #config
@@ -27,6 +29,8 @@ INTERVAL_BUCLA_MS = 1
 LATIME_VIDEO, INALTIME_VIDEO = 640, 480
 
 STARI_DISCONFORT = ('Discomfort/Pain', 'Discomfort')
+MESAJ_URGENTA = "Critical alert. Emergency signal sustained. Please respond immediately."
+MESAJ_DISCONFORT = "Attention. Patient has been showing signs of discomfort for an extended period."
 
 CULOARE_FUNDAL = "#0d1117"
 CULOARE_CARD = "#161b22"
@@ -52,31 +56,25 @@ class Aplicatie:
         print("Se incarca modelele...")
         self.detector_emotii = ClasificatorEmotii()
         self.detector_gesturi = ClasificatorGesturi()
+        self.analiza_emotii = ProcesareFundal(self.detector_emotii.proceseaza_cadru)
         self.tts = SintezaVocala()
         print("Modele incarcate.")
 
         #emotie/disconfort
         self.istoric_emotii = deque(maxlen=LUNGIME_ISTORIC_EMOTII)
         self.ultimul_rezultat_emotie = None
+        self.stare_pacient = None
         self.contor_cadre = 0
         self.ultima_detectie_fata = 0.0
-        self.disconfort_start = None
-        self.disconfort_alerta_activa = False
-        self.disconfort_ultima_rostire = None
+        self.disconfort = StareSustinuta(INTERVAL_RE_ALERTA_DISCONFORT)
 
         #gest/comanda
-        self.gest_candidat = None
-        self.comanda_candidat = None
-        self.timp_start_candidat = None
-        self.ultima_detectie_gest = 0.0
-        self.gest_deja_rostit = None
+        self.confirmare_gest = ConfirmareGest(GRACE_GEST)
+        self.gest_curent = None
         self.istoric_comenzi = deque(maxlen=7)
 
         #stare urgenta
-        self.urgenta_start = None
-        self.ultima_detectie_urgenta = 0.0
-        self.urgenta_alerta_activa = False
-        self.urgenta_ultima_rostire = None
+        self.urgenta = StareSustinuta(INTERVAL_RE_ALERTA_URGENTA, grace=GRACE_GEST)
 
         self.fps_time = time.time()
         self.fps = 0.0
@@ -321,25 +319,9 @@ class Aplicatie:
         self.var_timp_confirmare.set(TIMP_CONFIRMARE_GEST)
         self.var_prag_alerta.set(PRAG_ALERTA)
 
-    def _reseteaza_urgenta(self):
-        self.urgenta_start = None
-        self.urgenta_alerta_activa = False
-        self.urgenta_ultima_rostire = None
-
-    def _reseteaza_disconfort(self):
-        self.disconfort_start = None
-        self.disconfort_alerta_activa = False
-        self.disconfort_ultima_rostire = None
-
-    def _reseteaza_candidat_gest(self):
-        self.gest_candidat = None
-        self.comanda_candidat = None
-        self.timp_start_candidat = None
-        self.gest_deja_rostit = None
-
     def _anuleaza_ultima_comanda(self):
-        self._reseteaza_urgenta()
-        self._reseteaza_disconfort()
+        self.urgenta.reseteaza()
+        self.disconfort.reseteaza()
 
         if self.istoric_comenzi:
             self.istoric_comenzi.pop()
@@ -360,6 +342,8 @@ class Aplicatie:
             return
 
         frame = cv2.flip(frame, 1)
+        if frame.shape[1] != LATIME_VIDEO or frame.shape[0] != INALTIME_VIDEO:
+            frame = cv2.resize(frame, (LATIME_VIDEO, INALTIME_VIDEO))
         now = time.time()
 
         dt = now - self.fps_time
@@ -370,13 +354,12 @@ class Aplicatie:
         stare_afisata = {"comanda": "—", "progres_gest": 0.0,
                          "emotie_ro": "—", "emotie_hex": CULOARE_SUCCES, "incredere_emotie": 0.0}
 
-        progres_urgenta = self._proceseaza_gest(frame, now, stare_afisata)
-        progres_disconfort = self._proceseaza_emotie(frame, now, stare_afisata)
+        self._trimite_cadru_emotii(frame)
+        self._proceseaza_gest(frame, now, stare_afisata)
+        self._proceseaza_emotie(frame, now, stare_afisata)
+        progres_urgenta, progres_disconfort = self._proceseaza_alerte(now)
 
-        if frame.shape[1] != LATIME_VIDEO or frame.shape[0] != INALTIME_VIDEO:
-            frame = cv2.resize(frame, (LATIME_VIDEO, INALTIME_VIDEO))
-        frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-        img = ImageTk.PhotoImage(Image.fromarray(frame_rgb))
+        img = ImageTk.PhotoImage(Image.fromarray(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)))
         self.lbl_video.imgtk = img
         self.lbl_video.configure(image=img)
 
@@ -384,121 +367,88 @@ class Aplicatie:
 
         self.id_bucla = self.root.after(INTERVAL_BUCLA_MS, self._update)
 
+    def _trimite_cadru_emotii(self, frame):
+        if not self.activ_emotie.get():
+            return
+        self.contor_cadre += 1
+        if self.contor_cadre % INTERVAL_EMOTII == 0:
+            self.analiza_emotii.trimite(frame.copy())
+
     def _proceseaza_gest(self, frame, now, stare_afisata):
+        self.gest_curent = None
         if self.activ_gest.get():
-            landmarks, gest_raw, comanda_en, incredere_gest = self.detector_gesturi.proceseaza_cadru(frame)
+            landmarks, gest, incredere = self.detector_gesturi.proceseaza_cadru(frame)
+            if landmarks is not None and incredere > self.var_prag_gest.get():
+                repere_mana.deseneaza(frame, landmarks)
+                self.gest_curent = gest
         else:
-            landmarks, gest_raw, comanda_en, incredere_gest = None, None, None, 0.0
-            self._reseteaza_candidat_gest()
+            self.confirmare_gest.reseteaza()
 
-        gest_valid = landmarks is not None and incredere_gest > self.var_prag_gest.get()
+        progres, confirmat = self.confirmare_gest.actualizeaza(
+            self.gest_curent, now, self.var_timp_confirmare.get())
+        gest = self.confirmare_gest.gest
+        if gest is None:
+            return
 
-        if gest_valid:
-            repere_mana.deseneaza(frame, landmarks)
-            self.ultima_detectie_gest = now
-            if gest_raw != self.gest_candidat:
-                self.gest_candidat = gest_raw
-                self.comanda_candidat = comanda_en
-                self.timp_start_candidat = now
-        elif self.gest_candidat is not None and now - self.ultima_detectie_gest > GRACE_GEST:
-            self._reseteaza_candidat_gest()
+        comanda = ClasificatorGesturi.COMENZI_MEDICALE[gest]
+        if confirmat:
+            self.tts.roteste(comanda)
+            if gest == ClasificatorGesturi.GEST_ANULARE:
+                self._anuleaza_ultima_comanda()
+            elif self.activ_istoric.get():
+                self.istoric_comenzi.append(comanda)
 
-        if self.gest_candidat is not None:
-            progres = min((now - self.timp_start_candidat) / self.var_timp_confirmare.get(), 1.0)
-
-            if progres >= 1.0 and self.gest_deja_rostit != self.gest_candidat:
-                self.gest_deja_rostit = self.gest_candidat
-                self.tts.roteste(self.comanda_candidat)
-                if self.gest_candidat == ClasificatorGesturi.GEST_ANULARE:
-                    self._anuleaza_ultima_comanda()
-                elif self.activ_istoric.get():
-                    self.istoric_comenzi.append(self.comanda_candidat)
-
-            stare_afisata["comanda"] = self.comanda_candidat
-            stare_afisata["progres_gest"] = progres
-
-        if not self.activ_alerte.get():
-            self._reseteaza_urgenta()
-            return 0.0
-
-        if gest_valid and gest_raw == ClasificatorGesturi.GEST_URGENTA:
-            if self.urgenta_start is None:
-                self.urgenta_start = now
-            self.ultima_detectie_urgenta = now
-        elif (self.urgenta_start is not None and not self.urgenta_alerta_activa
-              and now - self.ultima_detectie_urgenta > GRACE_GEST):
-            self._reseteaza_urgenta()
-
-        if self.urgenta_start is None:
-            return 0.0
-
-        progres_urgenta = min((now - self.urgenta_start) / self.var_prag_alerta.get(), 1.0)
-        if progres_urgenta >= 1.0:
-            self.urgenta_alerta_activa = True
-            if (self.urgenta_ultima_rostire is None or
-                    now - self.urgenta_ultima_rostire > INTERVAL_RE_ALERTA_URGENTA):
-                self.tts.roteste_prioritar(
-                    "Critical alert. Emergency signal sustained. Please respond immediately."
-                )
-                self.urgenta_ultima_rostire = now
-        return progres_urgenta
+        stare_afisata["comanda"] = comanda
+        stare_afisata["progres_gest"] = progres
 
     def _proceseaza_emotie(self, frame, now, stare_afisata):
-        if self.activ_emotie.get():
-            self.contor_cadre += 1
-            if self.contor_cadre % INTERVAL_EMOTII == 0:
-                self.ultimul_rezultat_emotie = self.detector_emotii.proceseaza_cadru(frame)
-                if self.ultimul_rezultat_emotie:
-                    self.istoric_emotii.append(self.ultimul_rezultat_emotie['stare'])
-                    self.ultima_detectie_fata = now
-        else:
+        rezultat, nou = self.analiza_emotii.preia()
+        if not self.activ_emotie.get():
             self.contor_cadre = 0
             self.ultimul_rezultat_emotie = None
+        elif nou:
+            self.ultimul_rezultat_emotie = rezultat
+            if rezultat:
+                self.istoric_emotii.append(rezultat['stare'])
+                self.ultima_detectie_fata = now
 
-        fata_prezenta = (now - self.ultima_detectie_fata) <= GRACE_FATA
-        if not fata_prezenta:
+        if now - self.ultima_detectie_fata > GRACE_FATA:
             self.istoric_emotii.clear()
 
-        stare_stabila = Counter(self.istoric_emotii).most_common(1)[0][0] if self.istoric_emotii else None
+        self.stare_pacient = Counter(self.istoric_emotii).most_common(1)[0][0] if self.istoric_emotii else None
         res = self.ultimul_rezultat_emotie
+        if self.stare_pacient is None or res is None:
+            return
 
-        if stare_stabila and res:
-            culoare_bgr, culoare_hex = ClasificatorEmotii.CULORI_STARI[stare_stabila]
-            x, y, w, h = res['box']
-            cv2.rectangle(frame, (x, y), (x + w, y + h), culoare_bgr, 2, cv2.LINE_AA)
-            text_afisat = f"{stare_stabila} ({res['incredere'] * 100:.0f}%)"
-            cv2.rectangle(frame, (x, y - 30), (x + w, y), culoare_bgr, -1)
-            cv2.putText(frame, text_afisat, (x + 5, y - 8), cv2.FONT_HERSHEY_SIMPLEX, 0.50,
-                        (0, 0, 0) if culoare_bgr != (0, 0, 255) else (255, 255, 255), 2, cv2.LINE_AA)
+        culoare_bgr, culoare_hex = ClasificatorEmotii.CULORI_STARI[self.stare_pacient]
+        x, y, w, h = res['box']
+        cv2.rectangle(frame, (x, y), (x + w, y + h), culoare_bgr, 2, cv2.LINE_AA)
+        cv2.rectangle(frame, (x, y - 30), (x + w, y), culoare_bgr, -1)
+        cv2.putText(frame, f"{self.stare_pacient} ({res['incredere'] * 100:.0f}%)", (x + 5, y - 8),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.50,
+                    (0, 0, 0) if culoare_bgr != (0, 0, 255) else (255, 255, 255), 2, cv2.LINE_AA)
 
-            stare_afisata["emotie_ro"] = f"{stare_stabila} ({res['emotie_ro']})"
-            stare_afisata["emotie_hex"] = culoare_hex
-            stare_afisata["incredere_emotie"] = res['incredere']
+        stare_afisata["emotie_ro"] = f"{self.stare_pacient} ({res['emotie_ro']})"
+        stare_afisata["emotie_hex"] = culoare_hex
+        stare_afisata["incredere_emotie"] = res['incredere']
 
+    def _proceseaza_alerte(self, now):
         if not self.activ_alerte.get():
-            self._reseteaza_disconfort()
-            return 0.0
+            self.urgenta.reseteaza()
+            self.disconfort.reseteaza()
+            return 0.0, 0.0
 
-        if fata_prezenta and stare_stabila in STARI_DISCONFORT:
-            if self.disconfort_start is None:
-                self.disconfort_start = now
-        elif not self.disconfort_alerta_activa:
-            self.disconfort_start = None
-            self.disconfort_ultima_rostire = None
+        prag = self.var_prag_alerta.get()
+        progres_urgenta, anunta_urgenta = self.urgenta.actualizeaza(
+            self.gest_curent == ClasificatorGesturi.GEST_URGENTA, now, prag)
+        progres_disconfort, anunta_disconfort = self.disconfort.actualizeaza(
+            self.stare_pacient in STARI_DISCONFORT, now, prag)
 
-        if self.disconfort_start is None:
-            return 0.0
-
-        progres_disconfort = min((now - self.disconfort_start) / self.var_prag_alerta.get(), 1.0)
-        if progres_disconfort >= 1.0:
-            self.disconfort_alerta_activa = True
-            if (self.disconfort_ultima_rostire is None or
-                    now - self.disconfort_ultima_rostire > INTERVAL_RE_ALERTA_DISCONFORT):
-                self.tts.roteste_prioritar(
-                    "Attention. Patient has been showing signs of discomfort for an extended period."
-                )
-                self.disconfort_ultima_rostire = now
-        return progres_disconfort
+        if anunta_urgenta:
+            self.tts.roteste_prioritar(MESAJ_URGENTA)
+        elif anunta_disconfort:
+            self.tts.roteste_prioritar(MESAJ_DISCONFORT)
+        return progres_urgenta, progres_disconfort
 
     #PANOURI LATERALE
     def _update_ui(self, stare, progres_disconfort, progres_urgenta):
@@ -514,16 +464,16 @@ class Aplicatie:
         self.bara_emotie.place(width=int(stare['incredere_emotie'] * self.bara_emotie_bg.winfo_width()))
 
         self._seteaza_bara_alerta(self.bara_disconfort, self.bara_disconfort_bg,
-                                  self.lbl_pct_disconfort, progres_disconfort, self.disconfort_alerta_activa)
+                                  self.lbl_pct_disconfort, progres_disconfort, self.disconfort.activa)
         self._seteaza_bara_alerta(self.bara_urgenta, self.bara_urgenta_bg,
-                                  self.lbl_pct_urgenta, progres_urgenta, self.urgenta_alerta_activa)
+                                  self.lbl_pct_urgenta, progres_urgenta, self.urgenta.activa)
 
         flash = int(time.time() * 2) % 2 == 0
         culoare_banner = CULOARE_ALERTA_1 if flash else CULOARE_ALERTA_2
-        if self.urgenta_alerta_activa:
+        if self.urgenta.activa:
             self.lbl_banner.config(text="CRITICAL: semnal de urgenta sustinut",
                                    bg=culoare_banner, fg="white")
-        elif self.disconfort_alerta_activa:
+        elif self.disconfort.activa:
             self.lbl_banner.config(
                 text=f"ALERTA: disconfort sustinut de peste {self.var_prag_alerta.get():.0f} secunde",
                 bg=culoare_banner, fg="white")
@@ -551,6 +501,7 @@ class Aplicatie:
             self.root.after_cancel(self.id_bucla)
         self.cap.release()
         self.detector_gesturi.inchide()
+        self.analiza_emotii.opreste()
         self.tts.opreste()
         self.root.destroy()
 

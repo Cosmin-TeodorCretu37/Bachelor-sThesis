@@ -1,4 +1,5 @@
 import json
+import sys
 from pathlib import Path
 
 import matplotlib.pyplot as plt
@@ -9,9 +10,11 @@ from sklearn.preprocessing import LabelEncoder
 from sklearn.utils import shuffle
 from tensorflow import keras
 
-DIR_PROIECT = Path(__file__).resolve().parent.parent
-DIR_DATE = DIR_PROIECT / "antrenare" / "date_gesturi"
-DIR_MODELE = DIR_PROIECT / "modele"
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
+from src.config import DIR_ANTRENARE, DIR_MODELE
+
+DIR_DATE = DIR_ANTRENARE / "date_gesturi"
 
 #incarcare date
 GESTURI = ["pumn_inchis", "palma_deschisa", "unu", "doi", "trei", "ok"]
