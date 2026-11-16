@@ -7,7 +7,7 @@ from tensorflow import keras
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from src.config import DIR_ANTRENARE, DIR_MODELE
+from src.config import DIR_ANTRENARE, DIR_MODELE, MAPARE_EMOTII, MODEL_EMOTII
 
 DIR_DATE = DIR_ANTRENARE / "fer2013"
 
@@ -129,7 +129,7 @@ reduce_lr = keras.callbacks.ReduceLROnPlateau(
 
 #salveaza automat cel mai bun model
 checkpoint = keras.callbacks.ModelCheckpoint(
-    str(DIR_MODELE / "model_emotii_best.h5"),
+    str(MODEL_EMOTII),
     monitor='val_accuracy',
     save_best_only=True,
     verbose=1
@@ -150,7 +150,7 @@ loss, accuracy = model.evaluate(test_generator, verbose=0)
 print(f"\nAcuratete finala pe test: {accuracy * 100:.1f}%")
 
 #salvare mapare emotii
-with open(DIR_MODELE / "mapare_emotii.json", "w") as f:
+with open(MAPARE_EMOTII, "w") as f:
     json.dump(train_generator.class_indices, f, indent=2)
 
 print(f"Model si mapare salvate in '{DIR_MODELE}'")

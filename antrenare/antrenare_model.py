@@ -12,7 +12,7 @@ from tensorflow import keras
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from src.config import DIR_ANTRENARE, DIR_MODELE
+from src.config import DIR_ANTRENARE, DIR_MODELE, MAPARE_GESTURI, MODEL_GESTURI
 
 DIR_DATE = DIR_ANTRENARE / "date_gesturi"
 
@@ -111,10 +111,10 @@ print(f"\nAcuratete pe datele de test: {accuracy * 100:.1f}%")
 
 #save model + mapare
 DIR_MODELE.mkdir(exist_ok=True)
-model.save(DIR_MODELE / "model_gesturi.h5")
+model.save(MODEL_GESTURI)
 
 mapare = {gest: int(i) for i, gest in enumerate(encoder.classes_)}
-with open(DIR_MODELE / "mapare_gesturi.json", "w") as f:
+with open(MAPARE_GESTURI, "w") as f:
     json.dump(mapare, f, indent=2)
 
 print(f"\nModel si mapare salvate in '{DIR_MODELE}'")

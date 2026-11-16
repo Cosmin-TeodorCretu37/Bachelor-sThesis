@@ -4,9 +4,9 @@ DIR_PROIECT = Path(__file__).resolve().parent.parent
 DIR_MODELE = DIR_PROIECT / "modele"
 DIR_ANTRENARE = DIR_PROIECT / "antrenare"
 
-MODEL_GESTURI = DIR_MODELE / "model_gesturi.h5"
+MODEL_GESTURI = DIR_MODELE / "model_gesturi.keras"
 MAPARE_GESTURI = DIR_MODELE / "mapare_gesturi.json"
-MODEL_EMOTII = DIR_MODELE / "model_emotii_best.h5"
+MODEL_EMOTII = DIR_MODELE / "model_emotii.keras"
 MAPARE_EMOTII = DIR_MODELE / "mapare_emotii.json"
 TASK_MANA = DIR_MODELE / "hand_landmarker.task"
 TASK_FATA = DIR_MODELE / "blaze_face_short_range.tflite"

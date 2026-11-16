@@ -16,7 +16,7 @@ from src.config import DIR_ANTRENARE, MAPARE_GESTURI, MODEL_GESTURI
 print("Se incarca modelul si datele...")
 
 #incarcare+mapare gesturi
-model = tf.keras.models.load_model(MODEL_GESTURI)
+model = tf.keras.models.load_model(MODEL_GESTURI, compile=False)
 with open(MAPARE_GESTURI) as f:
     mapare = json.load(f)
 

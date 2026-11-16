@@ -47,7 +47,7 @@ class ClasificatorEmotii:
     }
 
     def __init__(self, calea_model=MODEL_EMOTII, calea_mapare=MAPARE_EMOTII):
-        self.model = tf.keras.models.load_model(calea_model)
+        self.model = tf.keras.models.load_model(calea_model, compile=False)
         with open(calea_mapare) as f:
             self.idx_la_emotie = {int(v): k for k, v in json.load(f).items()}
 

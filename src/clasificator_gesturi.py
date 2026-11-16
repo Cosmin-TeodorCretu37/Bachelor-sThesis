@@ -30,7 +30,7 @@ class ClasificatorGesturi:
     }
 
     def __init__(self, calea_model=MODEL_GESTURI, calea_mapare=MAPARE_GESTURI):
-        self.model = tf.keras.models.load_model(calea_model)
+        self.model = tf.keras.models.load_model(calea_model, compile=False)
         with open(calea_mapare) as f:
             self.idx_la_gest = {int(v): k for k, v in json.load(f).items()}
 

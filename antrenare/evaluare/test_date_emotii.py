@@ -16,7 +16,7 @@ from src.config import DIR_ANTRENARE, MAPARE_EMOTII, MODEL_EMOTII
 print("Se incarca modelul si datele...")
 
 #incarcare model si mapare
-model = tf.keras.models.load_model(MODEL_EMOTII)
+model = tf.keras.models.load_model(MODEL_EMOTII, compile=False)
 with open(MAPARE_EMOTII) as f:
     mapare = json.load(f)
 
