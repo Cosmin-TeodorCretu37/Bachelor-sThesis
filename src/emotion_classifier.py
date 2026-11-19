@@ -5,7 +5,7 @@ import cv2
 import numpy as np
 import tensorflow as tf
 
-from src.config import EMOTION_LABELS, EMOTION_MODEL
+from src.config import DISCOMFORT_PROBABILITY_THRESHOLD, EMOTION_LABELS, EMOTION_MODEL
 from src.detectors import FaceDetector
 
 
@@ -58,7 +58,16 @@ class EmotionClassifier:
         model_input = (face_resized / 255.0).astype(np.float32).reshape(1, 48, 48, 1)
 
         probabilities = self.model(model_input, training=False).numpy()[0]
-        best = int(np.argmax(probabilities))
+        return self.choose_emotion(probabilities)
+
+    def choose_emotion(self, probabilities, threshold=DISCOMFORT_PROBABILITY_THRESHOLD):
+        negative = [i for i, e in self.index_to_emotion.items() if self.CLINICAL_STATES[e] in self.DISCOMFORT_STATES]
+        others = [i for i in self.index_to_emotion if i not in negative]
+        discomfort = float(sum(probabilities[i] for i in negative))
+        if discomfort >= threshold:
+            best = max(negative, key=lambda i: probabilities[i])
+            return self.index_to_emotion[best], discomfort
+        best = max(others, key=lambda i: probabilities[i])
         return self.index_to_emotion[best], float(probabilities[best])
 
     def process_frame(self, frame):
