@@ -1,47 +1,47 @@
 from pathlib import Path
 
-DIR_PROIECT = Path(__file__).resolve().parent.parent
-DIR_MODELE = DIR_PROIECT / "modele"
-DIR_ANTRENARE = DIR_PROIECT / "antrenare"
+PROJECT_DIR = Path(__file__).resolve().parent.parent
+MODELS_DIR = PROJECT_DIR / "models"
+TRAINING_DIR = PROJECT_DIR / "training"
 
-MODEL_GESTURI = DIR_MODELE / "model_gesturi.keras"
-MAPARE_GESTURI = DIR_MODELE / "mapare_gesturi.json"
-MODEL_EMOTII = DIR_MODELE / "model_emotii.keras"
-MAPARE_EMOTII = DIR_MODELE / "mapare_emotii.json"
-TASK_MANA = DIR_MODELE / "hand_landmarker.task"
-TASK_FATA = DIR_MODELE / "blaze_face_short_range.tflite"
+GESTURE_MODEL = MODELS_DIR / "gesture_model.keras"
+GESTURE_LABELS = MODELS_DIR / "gesture_labels.json"
+EMOTION_MODEL = MODELS_DIR / "emotion_model.keras"
+EMOTION_LABELS = MODELS_DIR / "emotion_labels.json"
+HAND_TASK = MODELS_DIR / "hand_landmarker.task"
+FACE_TASK = MODELS_DIR / "blaze_face_short_range.tflite"
 
-FISIER_SETARI = DIR_PROIECT / "setari_pacient.json"
-DIR_JURNAL = DIR_PROIECT / "jurnal"
+SETTINGS_FILE = PROJECT_DIR / "patient_settings.json"
+EVENT_LOG_DIR = PROJECT_DIR / "logs"
 
 #config
-PRAG_INCREDERE_GEST = 0.75          #prag ignorare gest
-TIMP_CONFIRMARE_GEST = 2.5          #sec. gest -> comanda
-LUNGIME_ISTORIC_EMOTII = 10          #cadre vot majoritar
-PRAG_ALERTA = 7.0
+GESTURE_CONFIDENCE_THRESHOLD = 0.75  #gesture ignore threshold
+GESTURE_CONFIRMATION_TIME = 2.5      #sec. gesture -> command
+EMOTION_HISTORY_LENGTH = 10          #majority vote frames
+ALERT_THRESHOLD = 7.0
 
-GRACE_FATA = 1.5                    #toleranta fata
-GRACE_GEST = 1.0                    #toleranta gest
+FACE_GRACE = 1.5                     #face tolerance
+GESTURE_GRACE = 1.0                  #gesture tolerance
 
-INTERVAL_RE_ALERTA_DISCONFORT = 15  #re-anunt vocal
-INTERVAL_RE_ALERTA_URGENTA = 5
+DISCOMFORT_REALERT_INTERVAL = 15     #voice re-announcement
+EMERGENCY_REALERT_INTERVAL = 5
 
-INTERVAL_EMOTII = 3
-INTERVAL_BUCLA_MS = 1
-LATIME_VIDEO, INALTIME_VIDEO = 640, 480
-LUNGIME_ISTORIC_COMENZI = 7
+EMOTION_FRAME_INTERVAL = 3
+LOOP_INTERVAL_MS = 1
+VIDEO_WIDTH, VIDEO_HEIGHT = 640, 480
+COMMAND_HISTORY_LENGTH = 7
 
-MESAJ_URGENTA = "Critical alert. Emergency signal sustained. Please respond immediately."
-MESAJ_DISCONFORT = "Attention. Patient has been showing signs of discomfort for an extended period."
+EMERGENCY_MESSAGE = "Critical alert. Emergency signal sustained. Please respond immediately."
+DISCOMFORT_MESSAGE = "Attention. Patient has been showing signs of discomfort for an extended period."
 
-CULOARE_FUNDAL = "#0d1117"
-CULOARE_CARD = "#161b22"
-CULOARE_BORDURA = "#30363d"
-CULOARE_SEPARATOR = "#21262d"
-CULOARE_TEXT_SECUNDAR = "#8b949e"
-CULOARE_TEXT_LABEL = "#484f58"
-CULOARE_ACCENT = "#58a6ff"
-CULOARE_SUCCES = "#3fb950"
-CULOARE_AVERTIZARE = "#d29922"
-CULOARE_ALERTA_1 = "#f85149"
-CULOARE_ALERTA_2 = "#7a1f1a"
+COLOR_BACKGROUND = "#0d1117"
+COLOR_CARD = "#161b22"
+COLOR_BORDER = "#30363d"
+COLOR_SEPARATOR = "#21262d"
+COLOR_TEXT_SECONDARY = "#8b949e"
+COLOR_TEXT_LABEL = "#484f58"
+COLOR_ACCENT = "#58a6ff"
+COLOR_SUCCESS = "#3fb950"
+COLOR_WARNING = "#d29922"
+COLOR_ALERT_1 = "#f85149"
+COLOR_ALERT_2 = "#7a1f1a"
